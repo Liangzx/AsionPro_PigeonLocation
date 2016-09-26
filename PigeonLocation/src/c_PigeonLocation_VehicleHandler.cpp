@@ -176,7 +176,7 @@ void TCPigeonLocationVehicleHandler::MsgParsing(const TCString & content, Vehicl
 
 inline double TCPigeonLocationVehicleHandler::radian(double d)
 {
-	return d * PI / 180.0;   //실똑1? = ┪ / 180
+	return d * PI / 180.0;   //실똑1? = ┪ / 180/
 }
 
 inline double TCPigeonLocationVehicleHandler::get_distance(double lat1, double lng1, double lat2, double lng2)
