@@ -501,8 +501,8 @@ void TCPigeonLocationVehicleHandler::OutputRpBrJudgeSubproc(const VehiclePkg & p
 	sql_buf += ":f1MATCHID<char[256]>,";
 	sql_buf += ":f2MATCHNAME<char[256]>,";
 	sql_buf += ":f3MONITOR_TYPE<short>,";
-	sql_buf += ":f4MONITOR_ID<char[16]>,";
-	sql_buf += ":f5MONITOR_IMEI<char[16]>,";
+	sql_buf += ":f4MONITOR_ID<char[17]>,";
+	sql_buf += ":f5MONITOR_IMEI<char[17]>,";
 	sql_buf += ":f6MONITOR_SNDTIME<TIMESTAMP>,";
 	sql_buf += ":f7MONITOR_RECVTIME<TIMESTAMP>,";
 	sql_buf += ":f8MONITOR_RECORDTIME<TIMESTAMP>,";
@@ -576,8 +576,8 @@ void TCPigeonLocationVehicleHandler::OutputRpBrDevStatusMgr(const VehiclePkg & p
 	sql_buf += "THRESHOLD_FLAG)";
 	sql_buf += "VALUES(";
 	sql_buf += ":f1DEV_TYPE<int>,";
-	sql_buf += ":f2DEV_ID<char[16]>,";
-	sql_buf += ":f3DEV_IMEI<char[16]>,";
+	sql_buf += ":f2DEV_ID<char[17]>,";
+	sql_buf += ":f3DEV_IMEI<char[17]>,";
 	sql_buf += ":f4DEV_LONGITUDE<double>,";
 	sql_buf += ":f5DEV_LATITUDE<double>,";
 	sql_buf += ":f6DEV_HIGH<int>,";
