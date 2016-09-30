@@ -723,9 +723,10 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				sql_buf += info.rfid_;
 				sql_buf += "'";
 				otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
-				if (!otl_s.eof()) {
-					rfid_status_resp_infos.push_back(info);
-				}
+				//if (!otl_s.eof()) {
+				//	rfid_status_resp_infos.push_back(info);
+				//}
+				rfid_status_resp_infos.push_back(info);
 				otl_s.flush();
 				otl_s.close();
 			}
@@ -992,7 +993,7 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 	sql_buf += "THRESHOLD_FLAG";
 	sql_buf += ")";
 	sql_buf += "VALUES(";
-	sql_buf += ":f1MATCHID<char[32]>,";
+	sql_buf += ":f1MATCHID<char[33]>,";
 	sql_buf += ":f2MATCHNAME<char[256]>,";
 	sql_buf += ":f3OWNERID<char[17]>,";
 	sql_buf += ":f4OWNERNAME<char[32]>,";

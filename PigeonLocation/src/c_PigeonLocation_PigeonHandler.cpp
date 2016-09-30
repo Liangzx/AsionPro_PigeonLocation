@@ -217,7 +217,7 @@ bool TCPigeonLocationPigeonHandler::CheckRpBrgatherSubproc(const PigeonPkg & pkg
 	
 	otl_stream otl_s;
 	otl_s.open(1, sql_buf.c_str(), m_dbConnect);
-	otl_s >> info.matchid_;
+	//otl_s >> info.matchid_;
 	if (otl_s.eof()) {
 		return false;
 	}	else {
@@ -403,7 +403,7 @@ void TCPigeonLocationPigeonHandler::OutputRpBrRealLocation(PigeonPkg & pkg,
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[256]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
 	sql_buf += ":f03BI_RINGID<char[17]>,";
 	sql_buf += ":f04SEX<short>,";

@@ -252,6 +252,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrDevStatusMgr(HomingPosPkg & pkg
 	std::map<std::string, RpBzNestPadInfo>::iterator nest_pad_iter;
 	nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
 	std::string nestpad_id = "";
+
+	//TODO:找不到需要重新加载
 	if (nest_pad_iter == bz_nest_pad_infos.end()) {
 		LoadRpBzNestPad();
 		nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
@@ -480,7 +482,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[17]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
 	sql_buf += ":f03OWNERID<char[17]>,";
 	sql_buf += ":f04OWNERNAME<char[32]>,";
@@ -667,7 +669,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 			sql_buf += "MINUTE_SPEED";
 			sql_buf += ")";
 			sql_buf += "VALUES(";
-			sql_buf += ":f01MATCHID<char[17]>,";
+			sql_buf += ":f01MATCHID<char[33]>,";
 			sql_buf += ":f02MATCHNAME<char[256]>,";
 			sql_buf += ":f03OWNERID<char[17]>,";
 			sql_buf += ":f04OWNERNAME<char[32]>,";
@@ -854,7 +856,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[17]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
 	sql_buf += ":f03OWNERID<char[17]>,";
 	sql_buf += ":f04OWNERNAME<char[32]>,";
@@ -1049,7 +1051,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrPigeonNestVideo(const TCString 
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[17]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
 	sql_buf += ":f03OWNERID<char[17]>,";
 	sql_buf += ":f04OWNERNAME<char[32]>,";

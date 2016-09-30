@@ -195,9 +195,32 @@ b)服务器响应:
 ----
 /home/liangzx/AsionPro/PigeonLocation/source
 
-nohup /home/liangzx/AsionPro/PigeonLocation/source/PigeonLocation.bin -MutiP2 >> /home/liangzx/Run_Out/PigeonLocation_P2.out  2>&1&
+nohup /home/liangzx/AsionPro/PigeonLocation/src/PigeonLocation.bin -MutiP4 >> /home/liangzx/Run_Out/PigeonLocation_P4.out  2>&1&
 
-alter table mb_bss_terminal_location add partition PART_20160929 values less than (TIMESTAMP'2016-09-30 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20160930 values less than (TIMESTAMP'2016-10-01 00:00:00.000000') tablespace  T_MOBILE compress
 
 
 FDD-LTE_MRS_ERICSSON_OMC1_464266_2016092716300022.xml.zip
+
+
+----
+20160929
+集鸽经纬:
+30.652362,104.008797
+select * from RP_BR_GATHER_SUBPROC
+--30.652377,104.008803
+select * from RP_BZ_RACINGPIGEON
+--104.008797,30.652362
+
+---
+20160930
+match_id -->varchar[32]
+涉及的表:
+RP_BR_GATHER_SUBPROC
+RP_BR_MATCH_RESULT
+RP_BR_NESTVIDEO_SUBPROC
+RP_BR_PIGEON_NESTVIDEO
+RP_BR_NESTPAD_SUBPROC
+RP_BR_REALLOCATION
+RP_BR_JUDGE_SUBPROC
+RP_BZ_MATCH

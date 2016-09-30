@@ -498,7 +498,7 @@ void TCPigeonLocationVehicleHandler::OutputRpBrJudgeSubproc(const VehiclePkg & p
 	sql_buf += "MONITOR_HIGH)";
 	//sql_buf += "MONITOR_CONTENT)";
 	sql_buf += "VALUES(";
-	sql_buf += ":f1MATCHID<char[256]>,";
+	sql_buf += ":f1MATCHID<char[33]>,";
 	sql_buf += ":f2MATCHNAME<char[256]>,";
 	sql_buf += ":f3MONITOR_TYPE<short>,";
 	sql_buf += ":f4MONITOR_ID<char[17]>,";
