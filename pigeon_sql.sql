@@ -79,7 +79,7 @@ AT12,867106022056110,20160719191212,1,20160719191213,30.666549,104.022747,100,67
 
 2)赛鸽归巢指示
 a)超过阈值
-AT12,867106022056110,20160719191212,1,20160719191213,31.666549,104.022747,100,67,12,2,20160719191212,20160719191213,1,6A73005E3B,6A73005E3Bchk1,6A73005E3Bchk2,20160719191213,20160719191214,0,6A73005E3C,6A73005E3Cchk1,6A73005E3Cchk2,0,TA
+AT12,867106022056110,20160719191212,1,20160719191213,31.666549,104.022747,100,67,12,2,20160719191212,20160719191213,1,6A73005E3B,6A73005E3Bchk1,6A73005E3Bchk2,20160719191213,20160719191214,0,7A000A625C,6A73005E3Cchk1,6A73005E3Cchk2,0,TA
 b)未超过阈值
 AT12,867106022056110,20160719191212,1,20160719191213,30.666549,103.022747,100,67,12,2,20160719191211,20160719191212,1,6A73005E3B,6A73005E3Bchk1,6A73005E3Bchk2,20160719111213,20160719111214,0,6A73005E3C,6A73005E3Cchk1,6A73005E3Cchk2,0,TA
 
@@ -197,7 +197,16 @@ b)服务器响应:
 
 nohup /home/liangzx/AsionPro/PigeonLocation/src/PigeonLocation.bin -MutiP3 >> /home/liangzx/Run_Out/PigeonLocation_P3.out  2>&1&
 
-alter table mb_bss_terminal_location add partition PART_20160930 values less than (TIMESTAMP'2016-10-01 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161001 values less than (TIMESTAMP'2016-10-02 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161002 values less than (TIMESTAMP'2016-10-03 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161003 values less than (TIMESTAMP'2016-10-04 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161004 values less than (TIMESTAMP'2016-10-05 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161005 values less than (TIMESTAMP'2016-10-06 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161006 values less than (TIMESTAMP'2016-10-07 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161007 values less than (TIMESTAMP'2016-10-08 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161008 values less than (TIMESTAMP'2016-10-09 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161009 values less than (TIMESTAMP'2016-10-10 00:00:00.000000') tablespace  T_MOBILE compress
+alter table mb_bss_terminal_location add partition PART_20161010 values less than (TIMESTAMP'2016-10-11 00:00:00.000000') tablespace  T_MOBILE compress
 
 
 FDD-LTE_MRS_ERICSSON_OMC1_464266_2016092716300022.xml.zip
@@ -224,3 +233,44 @@ RP_BR_NESTPAD_SUBPROC
 RP_BR_REALLOCATION
 RP_BR_JUDGE_SUBPROC
 RP_BZ_MATCH
+----
+AT12															AT12           				数据段头 设备类型
+865067022697042                   867106022056110       设备识别码
+                                  20160719191212        归巢器时间
+1                                 1                     GPS定位状态
+20160930034445                    20160719191213        GPS时间
+30.647082                         31.666549             纬度
+104.015182                        104.022747            经度
+513.500                           100                   高度
+4.159                             67             				电池电压
+12                                12             				消息类型
+1                                 2              				归巢RFID数量N
+                                  20160719191212 				归巢器时间 1
+20160930034441                    20160719191213 				GPS时间1
+0                                 1              				模式1
+0                                 6A73005E3B 						归巢RFID标识1
+7A000A625C                        6A73005E3Bchk1
+                                  6A73005E3Bchk2
+                                  20160719191213
+0                                 20160719191214
+TA                                0
+                                  6A73005E3C
+                                  6A73005E3Cchk1
+                                  6A73005E3Cchk2
+                                  0
+                                  TA
+
+AT12,865067022697042,,1,20160930034445,30.647082,104.015182,513.500,4.159,12,1,,20160930034441,0,0,7A000A625C,,,0,TA
+AT12,865067022697042,,1,20160930034445,30.647082,104.015182,513.500,4.159,12,1,20160930034441,20160930034441,0,7A000A625C,,,0,TA
+
+RP_BZ_MATCH:
+29-SEP-16 03.30.00.000000 PM 104.067993 30.617798
+RP_BR_MATCH_RESULT:
+29-SEP-16 03.30.00.000000 PM 104.067993 30.617798
+
+104.015182 30.647082 30-SEP-16 01.15.58.000000 PM
+
+201609291530
+201609301315
+
+20160929153000 20160930114441

@@ -635,7 +635,9 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 			// 获得距离km
 			double distance_d = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude), matchstart_latitude, matchstart_longitude);
 			// 计算速度
-			double speed = distance_d * 1000 / interval_seconds / 60;
+			double speed = distance_d * 1000 / (interval_seconds / 60);
+			std::cout << "start time:" << (char *)matchstart_time_tc << "end time: time_tmp"
+				<< (char *)time_tmp << "seconds:" << interval_seconds << std::endl;
 			sql_buf = "INSERT INTO RP_BR_MATCH_RESULT";
 			sql_buf += "(";
 			sql_buf += "MATCHID,";
