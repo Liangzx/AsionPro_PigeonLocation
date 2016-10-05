@@ -722,13 +722,13 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				std::string sql_buf = "SELECT 1 FROM RP_BZ_RACINGPIGEON WHERE IRING_RFID='";
 				sql_buf += info.rfid_;
 				sql_buf += "'";
-				otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
+				//otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
 				//if (!otl_s.eof()) {
 				//	rfid_status_resp_infos.push_back(info);
 				//}
 				rfid_status_resp_infos.push_back(info);
-				otl_s.flush();
-				otl_s.close();
+				//otl_s.flush();
+				//otl_s.close();
 			}
 			TCString owner_id;
 			// 根据rfid保存需要查询的赛鸽信息
