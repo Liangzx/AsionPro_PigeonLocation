@@ -154,9 +154,9 @@ void TCPigeonLocationVehicleHandler::MsgParsing(const TCString & content, Vehicl
 	std::cout << "PKG:" << m_sPkg_Content << std::endl;
 	std::cout << "数据包时间偏移:" << (char *)pkg.pkg_pkg_offset <<
 		"海拔高度:" << (char *)pkg.pkg_altitude << std::endl;
-	//----2016-09-23--临时入表----
-	std::string sql_buf = "insert into mb_bss_terminal_location(day, imei, longitude, latitude, ACTIVE_TIME, LOCATION_TYPE)";
-	sql_buf += "values(:f0day<timestamp>, :f1imei<char[17]>, :f2longitude<char[31]>, :f3latitude<char[31]>,sysdate, '0')";
+	//----2016-09-23--入表----
+	std::string sql_buf = "insert into mb_bss_terminal_location(day, imei, longitude, latitude, ACTIVE_TIME, LOCATION_TYPE, ELECTRICITY)";
+	sql_buf += "values(:f0day<timestamp>, :f1imei<char[17]>, :f2longitude<char[31]>, :f3latitude<char[31]>,sysdate, '0', :f4electricity<char[7]>)";
 	TCString day = TCTime::Today();
 	if (day.GetLength() == 8) {
 		day += "000000";
@@ -169,8 +169,10 @@ void TCPigeonLocationVehicleHandler::MsgParsing(const TCString & content, Vehicl
 		ot_s << (char *)pkg.pkg_imei;
 		ot_s << (char *)pkg.pkg_longitude;
 		ot_s << (char *)pkg.pkg_latitude;
+		ot_s << (char *)pkg.pkg_voltage;
 		ot_s.close();
 	}
+	LOG_WRITE("longitude:%s,latitude:%s", (char *)pkg.pkg_longitude, (char *)pkg.pkg_latitude);
 	//----
 }
 

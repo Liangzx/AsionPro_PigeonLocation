@@ -142,6 +142,9 @@ private:
 	TCString m_sRespPkgContent;
 	static TCCriticalSection m_csLogLock;
 	int field_counts;
+	// 自动建表及分区
+	bool autoCreateTable(TCString sDay);
+	bool autoAddPartion(TCString sSay);
 private:
 	void GetDelay(const PigeonPkg pkg, TimeDelay & time_delay);
 	void GetNestPadLoc(const PigeonPkg & pkg, double & latitude, double & longitude);

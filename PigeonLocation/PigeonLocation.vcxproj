@@ -46,6 +46,10 @@
     <None Include="PigeonLocation.ini" />
     <None Include="src\makefile" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="MB_BSS_TERMINAL_LOCATION.sql" />
+    <Text Include="ADD_PARTION_MB_BSS_TERMINAL_LOCATION.sql" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9AB83300-C303-441A-8156-759F0628058B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

@@ -120,5 +120,85 @@ void TCPigeonLocationConfig::LoadIniFile(){
 		 sReadStr = ProfileAppString(Application.GetAppName(),
 			 "GENERAL", "DISTANCE_THRESHOLD_VALUE", "500");
 		 m_distance_threshold_value = (int)StrToInt(sReadStr);
+	//
+	// 表空间
+	db_table_space = ProfileAppString(Application.GetAppName(), "GENERAL", "DB_TABLE_SPACE", "USERS");
+	//
+	// 分区表的初始创建语句的文件名
+	long i;
+	TCIniFile ifIniFile;
+	ifIniFile.Load(MergePathAndFile(TAppPath::AppConfig(), Application.GetAppName() + ".ini"));
+
+	TCStringList lStrList;
+	TCStringList lTmpList;
+	TCString sSection_Name;
+	sSection_Name = "TABLE_NAME|INIT_CRTFILENAME*{";
+	sSection_Name += Application.GetProcessFlag();
+	sSection_Name += "}*";
+	lStrList.Clear();
+	ifIniFile.ReadSection(sSection_Name, lStrList);
+	if (lStrList.GetCount()>0)
+	{
+		//当前的特定定义存在;就用当前的；
+		printf("当前的特定定义存在: 配置文件加载的配置段[%s]\n", (char*)sSection_Name);
+	}
+	else
+	{
+		//当前的特定定义不存在，需要加载通用的配置定义
+		sSection_Name = "TABLE_NAME|INIT_CRTFILENAME";
+		ifIniFile.ReadSection(sSection_Name, lStrList);
+		printf("当前的特定定义不存在，需要加载通用的配置定义: 配置文件加载的配置段[%s]\n", (char*)sSection_Name);
+	}
+	m_ssTable_InitCrtFileName.clear();
+	for (i = 0; i < lStrList.GetCount(); i++)
+	{
+		lTmpList.Clear();
+		lTmpList.CommaText(lStrList[i], '|', false);
+
+		if (lTmpList.GetCount()<2)
+			continue;
+
+		TCString sTable_Name = AllTrim(lTmpList[0]);
+		sTable_Name = TrimCRLF(sTable_Name);
+
+		TCString sCreateTable_SQLFile = AllTrim(lTmpList[1]);
+		sCreateTable_SQLFile = TrimCRLF(sCreateTable_SQLFile);
+
+		m_ssTable_InitCrtFileName[sTable_Name] = sCreateTable_SQLFile;
+	}
+
+	// 相关分区表的创建分区语句的文件名
+	sSection_Name = "TABLE_NAME|ADDPART_FILENAME*{";
+	sSection_Name += Application.GetProcessFlag();
+	sSection_Name += "}*";
+	lStrList.Clear();
+	ifIniFile.ReadSection(sSection_Name, lStrList);
+	if (lStrList.GetCount()>0)
+	{
+		//当前的特定定义存在;就用当前的；
+		printf("当前的特定定义存在: 配置文件加载的配置段[%s]\n", (char*)sSection_Name);
+	}
+	else
+	{
+		//当前的特定定义不存在，需要加载通用的配置定义
+		sSection_Name = "TABLE_NAME|ADDPART_FILENAME";
+		ifIniFile.ReadSection(sSection_Name, lStrList);
+		printf("当前的特定定义不存在，需要加载通用的配置定义: 配置文件加载的配置段[%s]\n", (char*)sSection_Name);
+	}
+
+	m_ssTable_AddPartFileName.clear();
+	for (i = 0; i < lStrList.GetCount(); i++)
+	{
+		lTmpList.Clear();
+		lTmpList.CommaText(lStrList[i], '|', false);
+
+		if (lTmpList.GetCount()<2)
+			continue;
+		TCString sTable_Name = AllTrim(lTmpList[0]);
+		sTable_Name = TrimCRLF(sTable_Name);
+		TCString sAddPartion_SQLFile = AllTrim(lTmpList[1]);
+		sAddPartion_SQLFile = TrimCRLF(sAddPartion_SQLFile);
+		m_ssTable_AddPartFileName[sTable_Name] = sAddPartion_SQLFile;
+	}
     return;
 }

@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="sql">
+      <UniqueIdentifier>{9e18c297-429d-46fd-a663-657d52bf8ce6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\c_PigeonLocation_config.cpp">
@@ -81,5 +84,13 @@
   <ItemGroup>
     <None Include="PigeonLocation.ini" />
     <None Include="src\makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="MB_BSS_TERMINAL_LOCATION.sql">
+      <Filter>sql</Filter>
+    </Text>
+    <Text Include="ADD_PARTION_MB_BSS_TERMINAL_LOCATION.sql">
+      <Filter>sql</Filter>
+    </Text>
   </ItemGroup>
 </Project>
