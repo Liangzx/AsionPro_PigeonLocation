@@ -68,14 +68,19 @@ bool TCPigeonLocationVehicleHandler::Main_Handler(TCCustomUniSocket  &cusSocket)
 		//: 远程发送的地址
 		m_sTacker_Send_IPAddress=cusSocket.GetRemoteAddress();
 		m_nTimeOut=60;
-		
-		printf("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n", (char*)cusSocket.GetRemoteAddress(), cusSocket.GetRemotePort(), m_nTimeOut);
+#ifdef __TEST__
+		LOG_WRITE("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n"
+			, (char*)cusSocket.GetRemoteAddress(), cusSocket.GetRemotePort(), m_nTimeOut);
+#endif // __TEST__
 		
 		//: 长连接方式
 		while(1){			
 			Init();
-			TCString sLogMsg="Time:Now=["+TCTime::Now()+"],Recv Port=["+IntToStr(cusSocket.GetRemotePort())+"] Data";
-            glgMls->AddPigeonLocationRunLog(sLogMsg);
+#ifdef __TEST__
+		TCString sLogMsg = "Time:Now=[" + TCTime::Now() + "],Recv Port=[" + IntToStr(cusSocket.GetRemotePort()) + "] Data";
+		glgMls->AddPigeonLocationRunLog(sLogMsg);
+#endif // __TEST__
+
  			RecvRequest(cusSocket);
 			threshold_flag = 0;
  			DealRequest(cusSocket);	
@@ -107,7 +112,7 @@ void TCPigeonLocationVehicleHandler::DealRequest(TCCustomUniSocket  &cusSocket){
 		//: 按照命令字进行处理；
 #ifdef __TEST__
    	printf("============receive Tracker request==============\n");
-   	printf("Command:=%s, Content=[%s], Time=[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
+   	LOG_WRITE("Command:=%s, Content=[%s], Time=[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
 #endif
 
 		//======执行服务调用==========================
@@ -219,8 +224,7 @@ void TCPigeonLocationVehicleHandler::RecvRequest(TCCustomUniSocket  &cusSocket){
 		if(!cusSocket.WaitForData(nTimeOut)){
 			//: 超时120秒了，可以直接关闭连接；
 			TCString sLog="Vehicle Tracker[" + m_sTacker_Send_IPAddress + "]已经超时120秒未发送数据，断开连接";
-			printf("%s\n", (char*)sLog);
-			glgMls->AddPigeonLocationRunLog(sLog);
+			LOG_WRITE("%s\n", (char*)sLog);
 			throw TCException(sLog);
 		}
 		
@@ -229,8 +233,8 @@ void TCPigeonLocationVehicleHandler::RecvRequest(TCCustomUniSocket  &cusSocket){
 		m_sRecvTime = TCTime::Now();
 		if(nGetPkgLen==0){
 			TCString sLog="Vehicle Tracker[" + m_sTacker_Send_IPAddress + "]已经断开连接";
-			printf("%s\n", (char*)sLog);
-			glgMls->AddPigeonLocationRunLog(sLog);
+			LOG_WRITE("%s\n", (char*)sLog);
+			//glgMls->AddPigeonLocationRunLog(sLog);
 			throw TCException(sLog);
 		}
 			
@@ -239,12 +243,13 @@ void TCPigeonLocationVehicleHandler::RecvRequest(TCCustomUniSocket  &cusSocket){
     if(Length(sPkg_Content)<4){
     	//: 异常，请检查数据
     	TCString sLogMsg;
-			sLogMsg = "";
-			sLogMsg += TCString("ERROR: 请求报文长度异常=[")+IntToStr(Length(sPkg_Content))+"]" ;
-	  	glgMls->AddPigeonLocationRunLog(sLogMsg);
-    	printf("Error Packet Format: %s\n", (char*)sLogMsg);
+		sLogMsg = "";
+		sLogMsg += TCString("ERROR: 请求报文长度异常=[")+IntToStr(Length(sPkg_Content))+"]" ;
+		LOG_WRITE("%s\n", (char *)sLogMsg);
+	  	//glgMls->AddPigeonLocationRunLog(sLogMsg);
+		//printf("Error Packet Format: %s\n", (char*)sLogMsg);
     	cusSocket.Close();
-			throw TCException(sLogMsg);
+		throw TCException(sLogMsg);
     }
     
     m_sReq_Command=Mid(sPkg_Content, 3, 2);
@@ -270,13 +275,13 @@ void TCPigeonLocationVehicleHandler::RecvRequest(TCCustomUniSocket  &cusSocket){
 	m_vsPkgList.push_back(m_sPkg_Content);
     }
     
-    //======== 5. 记录日志 =============
-    TCString sLogMsg;
-		sLogMsg = "";
-		sLogMsg += TCString("请求命令码:(") + m_sReq_Command, +"), 记录数=("+IntToStr(m_vsPkgList.size());
-		sLogMsg += TCString(") 内容：（ ") + m_sPkg_Content;
-		sLogMsg += TCString(") 请求包结束\n");
-    glgMls->AddPigeonLocationRunLog(sLogMsg);
+ //   //======== 5. 记录日志 =============
+ //   TCString sLogMsg;
+	//sLogMsg = "";
+	//sLogMsg += TCString("请求命令码:(") + m_sReq_Command, +"), 记录数=("+IntToStr(m_vsPkgList.size());
+	//sLogMsg += TCString(") 内容：（ ") + m_sPkg_Content;
+	//sLogMsg += TCString(") 请求包结束\n");
+ //   glgMls->AddPigeonLocationRunLog(sLogMsg);
   }catch (TCException &e){
     cusSocket.Close();
     throw e;
@@ -305,9 +310,8 @@ void TCPigeonLocationVehicleHandler::SendRespPkg(TCCustomUniSocket  &cusSocket, 
 	m_sSendTime=TCTime::Now();
 
 #ifdef __TEST__		
-	printf("RecvTime=[%s], SendTime=[%s], sTmpRespContent=[%s]\n", (char*)m_sRecvTime, (char*)m_sSendTime, (char*)sTmpRespContent);
+	LOG_WRITE("RecvTime=[%s], SendTime=[%s], SendContent=[%s]\n", (char*)m_sRecvTime, (char*)m_sSendTime, (char*)sTmpRespContent);
 #endif
-
 }
 
 //==========================================================================
@@ -335,8 +339,8 @@ void TCPigeonLocationVehicleHandler::DoCommand_LocInfo(TCCustomUniSocket  &cusSo
 			sLogMsg = "";
 			sLogMsg += TCString("请求命令码:(") + m_sReq_Command;
 			sLogMsg += TCString(") 报文异常，域数量=[") + IntToStr(lsTrackerPkgList.GetCount())+"]";
-			glgMls->AddPigeonLocationRunLog(sLogMsg);
-			printf("报文异常TCPigeonLocationVehicleHandler::DoCommand_PigeonLocInfo: %s\n", (char *)sLogMsg);
+			//glgMls->AddPigeonLocationRunLog(sLogMsg);
+			LOG_WRITE("报文异常TCPigeonLocationVehicleHandler::DoCommand_PigeonLocInfo: %s\n", (char *)sLogMsg);
 			throw TCException(sLogMsg);
 		}
 		//报文解析
@@ -373,9 +377,11 @@ void TCPigeonLocationVehicleHandler::DoCommand_LocInfo(TCCustomUniSocket  &cusSo
 		}
 		otl_s.flush();
 		otl_s.close();
-
+#ifdef __TEST__
 		std::cout << "init_start_delay,high_speed_delay,reach_time_delay:"
 			<< init_start_delay << ',' << high_speed_delay << ',' << reach_time_delay << std::endl;
+#endif // __TEST__
+
 
 		//TODO:基础数据查询 RP_BZ_CARMON_DEV 表CarMon_IMEI =Pkg.IMEI;
 		//
@@ -408,6 +414,9 @@ void TCPigeonLocationVehicleHandler::DoCommand_LocInfo(TCCustomUniSocket  &cusSo
 			otl_s >> start_longitude;
 			otl_s >> match_id;
 			otl_s >> match_name;
+		} else {
+			LOG_WRITE("[%s]表RP_BZ_CARMON_DEV无对应IMEI[%s]信息\n", (char *)TCTime::Now()
+				, (char *)pkg.pkg_imei);
 		}
 		otl_s.flush();
 		otl_s.close();
@@ -418,21 +427,36 @@ void TCPigeonLocationVehicleHandler::DoCommand_LocInfo(TCCustomUniSocket  &cusSo
 		//根据当前的GPS信息与集鸽点的位置，比赛放飞点的位置，计算距离
 		double gather_distance = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude),
 			gather_latitude, gather_longitude);
+
+#ifdef __TEST__
 		std::cout << "gather_distance:" << gather_distance << std::endl;
+#endif // __TEST__
+
 		double start_distance = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude),
 			start_latitude, start_longitude);
+
+#ifdef __TEST__
 		std::cout << "start_distance:" << start_distance << std::endl;
+#endif // __TEST__
+		
 		if (pkg.pkg_gps_flag == "0" || gather_distance <= 30.0) {
 			interval_recv = init_start_delay;
+#ifdef __TEST__
 			std::cout << "interval_recv::init_start_delay(30]km" << init_start_delay
 				<< "," << random_num << std::endl;
+#endif // __TEST__
 		}	else if (gather_distance > 30.0 && start_distance > 10.0) {
 			interval_recv = high_speed_delay;
+#ifdef __TEST__
 			std::cout << "interval_recv::high_speed_delay(10-30)km" << high_speed_delay
 				<< "," << random_num << std::endl;
+#endif // __TEST__
+
 		}	else {
+#ifdef __TEST__
 			std::cout << "interval_recv::reach_time_delay(else]km" << reach_time_delay
 				<< "," << random_num << std::endl;
+#endif // __TEST__
 		}
 		
 		interval_recv += random_num;
@@ -474,6 +498,7 @@ void TCPigeonLocationVehicleHandler::OutputRpBrJudgeSubproc(const VehiclePkg & p
 	otl_stream otl_s(10, sql_buf.c_str(), m_dbConnect);
 	std::string match_id, match_name, carmonid;
 	if (otl_s.eof()) {
+		LOG_WRITE("[%s]表RP_BZ_CARMON_DEV无对应IMEI[%s]信息", (char *)TCTime::Now(), (char *)pkg.pkg_imei);
 		return;
 	}
 	otl_s >> match_id;
