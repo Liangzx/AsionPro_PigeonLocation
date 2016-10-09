@@ -412,7 +412,6 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 					otl_s >> nestpad_backtime;
 					TCString time_bk;
 					OTLDateTime2String(nestpad_backtime, time_bk);
-					time_bk = TCTime::RelativeTime(time_bk, -8 * 3600);
 					if (FloatToStr(nestpad_longitude) != pkg.pkg_longitude
 						&& FloatToStr(nestpad_latitude) != pkg.pkg_latitude
 						&& nestpad_imei.c_str() != pkg.pkg_imei
