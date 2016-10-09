@@ -198,6 +198,7 @@ b)·þÎñÆ÷ÏìÓ¦:
 /home/liangzx/AsionPro/PigeonLocation/source
 
 nohup /home/liangzx/AsionPro/PigeonLocation/src/PigeonLocation.bin -MutiP3 >> /home/liangzx/Run_Out/PigeonLocation_P3.out  2>&1&
+nohup /home/liangzx/AsionPro/PigeonLocation/source/PigeonLocation.bin -MutiP1 >> /home/liangzx/Run_Out/PigeonLocation_P1.out  2>&1&
 
 alter table mb_bss_terminal_location add partition PART_20161001 values less than (TIMESTAMP'2016-10-02 00:00:00.000000') tablespace  T_MOBILE compress
 alter table mb_bss_terminal_location add partition PART_20161002 values less than (TIMESTAMP'2016-10-03 00:00:00.000000') tablespace  T_MOBILE compress
