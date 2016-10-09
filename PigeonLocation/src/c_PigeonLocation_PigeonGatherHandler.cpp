@@ -69,7 +69,11 @@ bool TCPigeonLocationPigeonGatherHandler::Main_Handler(TCCustomUniSocket  &cusSo
 		m_nTimeOut = 60;		
 		distance_threshold = gPigeonLocationConfig->GetDistanceThresholdValue() / 1000.0;
 		delay_seconds = "60";
-		printf("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n", (char*)cusSocket.GetRemoteAddress(), cusSocket.GetRemotePort(), m_nTimeOut);
+#ifdef __TEST__
+		LOG_WRITE("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n",
+			(char*)cusSocket.GetRemoteAddress(), cusSocket.GetRemotePort(), m_nTimeOut);
+#endif // __TEST__
+
 		/*
 		查询RP_BZ_PIGEON_OWNER表，将鸽主的MOBILE和OWNERID、OWNERNAME、OWNERNAME_CHN获取到内存中，
 		按照MOBILE为主键保存，定期或者按照该MOBILE查询未查询到时，从数据库中重新更新		
@@ -81,8 +85,12 @@ bool TCPigeonLocationPigeonGatherHandler::Main_Handler(TCCustomUniSocket  &cusSo
 		while (1) {
 			m_sRecvTime = TCTime::Now();
 			Init();
+
+#ifdef __TEST__
 			TCString sLogMsg = "Time:Now=[" + TCTime::Now() + "],Recv Port=[" + IntToStr(cusSocket.GetRemotePort()) + "] Data";
 			glgMls->AddPigeonLocationRunLog(sLogMsg);
+#endif // __TEST__
+
 			RecvRequest(cusSocket);
 			threshold_flag = 0;
 			DealRequest(cusSocket);
@@ -116,7 +124,7 @@ void TCPigeonLocationPigeonGatherHandler::DealRequest(TCCustomUniSocket  &cusSoc
 		//: 按照命令字进行处理；
 #ifdef __TEST__
 		printf("============receive Tracker request==============\n");
-		printf("Command:=%s, Content=[%s], Time=[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
+		LOG_WRITE("Command[%s], Content[%s], Time[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
 #endif
 
 		//======执行服务调用==========================
@@ -166,7 +174,6 @@ void TCPigeonLocationPigeonGatherHandler::MsgParsing(const TCString & content, P
 	pkg.pkg_altitude = lsTrackerPkgList[6];
 	pkg.pkg_voltage = lsTrackerPkgList[7];
 	pkg.pkg_msg_id = lsTrackerPkgList[8];
-	std::cout << "PKG:" << (char *)m_sPkg_Content << std::endl;
 	__LEAVEFUNCTION;
 }
 
@@ -240,9 +247,11 @@ void TCPigeonLocationPigeonGatherHandler::GetRacingPigeonInfosByRfid(RacingPigeo
 			otl_s >> racing_pegeons.iring_imei;
 			otl_s >> racing_pegeons.iring_blemac;
 			otl_s >> racing_pegeons.iring_mobile;
-		}	else {
+		} else {
 			// 不入表
 			racing_pegeons.rfid = "-1";
+			LOG_WRITE("[%s]表RP_BZ_RACINGPIGEON无对应得rfid[%s]信息\n", (char *)TCTime::Now(),
+				racing_pegeons.rfid.c_str());
 		}
 		otl_s.flush();
 		otl_s.close();
@@ -313,6 +322,7 @@ bool TCPigeonLocationPigeonGatherHandler::GetRFIDStatusRespInfo(std::vector<RFID
 			// 该rfid已报名
 			rfidstatusrespinfo[i].rfid_status_ = "1";
 		}	else {
+			rfidstatusrespinfo[i].rfid_status_ = "0";
 			null_num++;
 		}
 		otl_s.flush();
@@ -359,6 +369,10 @@ void TCPigeonLocationPigeonGatherHandler::GetRacingPigeonsDataRespInfo(std::vect
 			otl_s >> racingpigeonsdatarespinfos[i].iring_blemac;
 			otl_s >> racingpigeonsdatarespinfos[i].iring_mobile;
 			otl_s >> racingpigeonsdatarespinfos[i].iring_imsi;
+		}
+		else
+		{
+			LOG_WRITE("RP_BZ_IRING无对应的rfid[%s]", racingpigeonsdatarespinfos[i].rfid.c_str());
 		}
 		otl_s.flush();
 		otl_s.close();
@@ -489,9 +503,9 @@ void TCPigeonLocationPigeonGatherHandler::RecvRequest(TCCustomUniSocket  &cusSoc
 		nGetPkgLen = cusSocket.ReceiveBuf(sbuff, nMaxPkg_Length);
 
 		if (nGetPkgLen == 0) {
-			TCString sLog = "Vehicle Tracker[" + m_sTacker_Send_IPAddress + "]已经断开连接";
-			printf("%s\n", (char*)sLog);
-			glgMls->AddPigeonLocationRunLog(sLog);
+			TCString sLog = "PigeonGatherHandler Tracker[" + m_sTacker_Send_IPAddress + "]已经断开连接";
+			LOG_WRITE("%s\n", (char*)sLog);
+			//glgMls->AddPigeonLocationRunLog(sLog);
 			throw TCException(sLog);
 		}
 
@@ -502,8 +516,8 @@ void TCPigeonLocationPigeonGatherHandler::RecvRequest(TCCustomUniSocket  &cusSoc
 			TCString sLogMsg;
 			sLogMsg = "";
 			sLogMsg += TCString("ERROR: 请求报文长度异常=[") + IntToStr(Length(sPkg_Content)) + "]";
-			glgMls->AddPigeonLocationRunLog(sLogMsg);
-			printf("Error Packet Format: %s\n", (char*)sLogMsg);
+			//glgMls->AddPigeonLocationRunLog(sLogMsg);
+			LOG_WRITE("Error Packet Format: %s\n", (char*)sLogMsg);
 			cusSocket.Close();
 			throw TCException(sLogMsg);
 		}
@@ -532,13 +546,13 @@ void TCPigeonLocationPigeonGatherHandler::RecvRequest(TCCustomUniSocket  &cusSoc
 			m_vsPkgList.push_back(m_sPkg_Content);
 		}
 
-		//======== 5. 记录日志 =============
-		TCString sLogMsg;
-		sLogMsg = "";
-		sLogMsg += TCString("请求命令码:(") + m_sReq_Command, +"), 记录数=(" + IntToStr(m_vsPkgList.size());
-		sLogMsg += TCString(") 内容：（ ") + m_sPkg_Content;
-		sLogMsg += TCString(") 请求包结束\n");
-		glgMls->AddPigeonLocationRunLog(sLogMsg);
+		////======== 5. 记录日志 =============
+		//TCString sLogMsg;
+		//sLogMsg = "";
+		//sLogMsg += TCString("请求命令码:(") + m_sReq_Command, +"), 记录数=(" + IntToStr(m_vsPkgList.size());
+		//sLogMsg += TCString(") 内容：（ ") + m_sPkg_Content;
+		//sLogMsg += TCString(") 请求包结束\n");
+		//glgMls->AddPigeonLocationRunLog(sLogMsg);
 	}
 	catch (TCException &e) {
 		cusSocket.Close();
@@ -571,7 +585,7 @@ void TCPigeonLocationPigeonGatherHandler::SendRespPkg(TCCustomUniSocket  &cusSoc
 	m_sSendTime = TCTime::Now();
 
 #ifdef __TEST__
-	printf("RecvTime=[%s], SendTime=[%s], sTmpRespContent=[%s]\n", (char*)m_sRecvTime, (char*)m_sSendTime, (char*)sTmpRespContent);
+	LOG_WRITE("RecvTime=[%s], SendTime=[%s], SendContent=[%s]\n", (char*)m_sRecvTime, (char*)m_sSendTime, (char*)sTmpRespContent);
 #endif
 
 }
@@ -600,8 +614,8 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			sLogMsg = "";
 			sLogMsg += TCString("请求命令码:(") + m_sReq_Command;
 			sLogMsg += TCString(") 报文异常，域数量=[") + IntToStr(lsTrackerPkgList.GetCount()) + "]";
-			glgMls->AddPigeonLocationRunLog(sLogMsg);
-			printf("报文异常TCPigeonLocationPigeonGatherHandler::DoCommand_PigeonLocInfo: %s\n", (char *)sLogMsg);
+			//glgMls->AddPigeonLocationRunLog(sLogMsg);
+			LOG_WRITE("报文异常TCPigeonLocationPigeonGatherHandler::DoCommand_PigeonLocInfo: %s\n", (char *)sLogMsg);
 			//throw TCException(sLogMsg);
 			return;
 		}
@@ -626,11 +640,12 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 					double distance_gather_pkg = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude),
 						iter->second.gather_addr_latitude_, iter->second.gather_addr_longitude_);
 					if (distance_gather_pkg > distance_threshold) {
-						TCString sLogMsg;
-						sLogMsg = "";
-						sLogMsg += TCString("ERROR: 距离超过阈值.");
-						glgMls->AddPigeonLocationRunLog(sLogMsg);
-						printf("distance: %.4f, Error Packet Format: %s\n", distance_gather_pkg,(char*)sLogMsg);
+						//TCString sLogMsg;
+						//sLogMsg = "";
+						//sLogMsg += TCString("距离超过阈值");
+						//glgMls->AddPigeonLocationRunLog(sLogMsg);
+						LOG_WRITE("[%s]距离超过阈值:distance: %.4f, distance_threshold: %.4f\n",
+							(char *)TCTime::Now(), distance_gather_pkg, distance_threshold);
 
 						//TCString resp_content = delay_seconds +"," + TCTime::Now();
 						threshold_flag = 1;
@@ -638,6 +653,9 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 						//throw TCException(sLogMsg);
 					}
 				}
+			} else {
+				LOG_WRITE("[%s]表RP_BZ_GATHER_DEV无对应得IMEI[%s]信息", (char *)TCTime::Now(),
+					(char *)pkg.pkg_gather_imei);
 			}
 			// RP_BR_DEVSTATUS_MGR 表登记集鸽器
 			OutputRpBrDevStatusMgr(pkg, 1);
@@ -680,21 +698,20 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				double distance_gather_pkg = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude),
 					iter->second.gather_addr_latitude_, iter->second.gather_addr_longitude_);
 				if (distance_gather_pkg > distance_threshold) {
-					TCString sLogMsg;
-					sLogMsg = "";
-					sLogMsg += TCString("ERROR: 距离超过阈值.");
-					glgMls->AddPigeonLocationRunLog(sLogMsg);
-					printf("distance: %.4f, Error Packet Format: %s\n", distance_gather_pkg, (char*)sLogMsg);
-
+					//TCString sLogMsg;
+					//sLogMsg = "";
+					//sLogMsg += TCString("ERROR: 距离超过阈值.");
+					//glgMls->AddPigeonLocationRunLog(sLogMsg);
+					LOG_WRITE("[%s]距离超过阈值:distance: %.4f, distance_threshold: %.4f\n",
+						(char *)TCTime::Now(), distance_gather_pkg, distance_threshold);
 					//TCString resp_content = lsTrackerPkgList[9] + "," + lsTrackerPkgList[12];
 					//SendRespPkg(cusSocket, TCString("33"), resp_content);
 					threshold_flag = 1;
 					//throw TCException(sLogMsg);
 				}
 			}	else {
-				TCString s_log = "GATHER_DEV未找到对应的imei:" + pkg.pkg_gather_imei;
-				printf("%s", (char *)s_log);
-				glgMls->AddPigeonLocationRunLog(s_log);
+				LOG_WRITE("[%s]表RP_BZ_GATHER_DEV无对应得IMEI[%s]信息", (char *)TCTime::Now(),
+					(char *)pkg.pkg_gather_imei);
 			}			
 
 			TCString resp_content = lsTrackerPkgList[9] + "," + lsTrackerPkgList[12];
@@ -737,7 +754,8 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				/*
 				如果上述的结果全部为空，那么需要从内存中查询该手机号码对应的机主鸽舍和用户ID信息
 				获取到 OWNERID、OWNERNAME、OWNERNAME_CHN
-				*/				
+				*/
+				LOG_WRITE("[%s]根据鸽主手机号获取鸽舍相关信息", (char *)TCTime::Now());
 				std::map<std::string, PigeonOwnerInfo>::iterator iter_pigeon_owner =
 					pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
 				if (iter_pigeon_owner == pigeon_owner_infos.end()) {
@@ -759,6 +777,9 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			std::vector<RpBzGatherNestPadInfo> nest_pad_infos;
 
 			GetRpBzGatherNestPadInfo((char *)owner_id,nest_pad_infos);
+			if (nest_pad_infos.empty()) {
+				LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应的[%s]信息", (char *)TCTime::Now(), (char *)owner_id);
+			}
 			// 拼接报文			
 			std::string res_buf = JointPkgFields(nest_pad_infos, rfid_status_resp_infos);
 			TCString resp_content = lsTrackerPkgList[9];
@@ -790,6 +811,10 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				owerinfo.ownername_chn_ = owner_iter->second.ownername_chn_;
 				owerinfo.owner_id_ = owner_iter->second.owner_id_;
 				owerinfo.owner_name_ = owner_iter->second.owner_name_;
+			} else {
+				LOG_WRITE("[%s]表RP_BZ_PIGEON_OWNER没有对应的mobile[%s]信息", (char *)TCTime::Now(),
+					moble.c_str());
+
 			}
 			// 根据pkg.imei获取集鸽器信息
 			std::map<std::string, GatherDevInfo>::iterator dev_iter;
@@ -847,6 +872,10 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 					if (!otl_s.eof()) {
 						racing_pigeons_data_resp_info.push_back(res_info);
 					}
+					else
+					{
+						LOG_WRITE("RP_BZ_IRING 无对应的rfid[%s]", res_info.rfid.c_str());
+					}
 					otl_s.flush();
 					otl_s.close();
 				}	catch (const otl_exception & e) {
@@ -901,6 +930,10 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrDevStatusMgr(const PigeonGat
 
 	if (iter != gather_dev_infos.end()) {
 		gatger_id = iter->second.gatger_id_;
+	}
+	else
+	{
+		LOG_WRITE("[%s]表RP_BZ_GATHER_DEV无对应IMEI[%s]信息", (char *)TCTime::Now(), (char *)pkg.pkg_gather_imei)
 	}
 
 	std::string tb_name = "RP_BR_DEVSTATUS_MGR";
@@ -1023,7 +1056,6 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 
 	short valid_flag = 1;
 	for (int i = 0; i < racing_pegeons.size(); i++) {
-		printf("TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc:match_id[%s]\n", dev_info.match_id_.c_str());
 		otl_s << dev_info.match_id_;
 		otl_s << dev_info.match_name_;
 		otl_s << racing_pegeons[i].owner_id;

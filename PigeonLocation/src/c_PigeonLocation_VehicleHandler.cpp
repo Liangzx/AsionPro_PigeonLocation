@@ -112,7 +112,7 @@ void TCPigeonLocationVehicleHandler::DealRequest(TCCustomUniSocket  &cusSocket){
 		//: 按照命令字进行处理；
 #ifdef __TEST__
    	printf("============receive Tracker request==============\n");
-   	LOG_WRITE("Command:=%s, Content=[%s], Time=[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
+   	LOG_WRITE("Command[%s], Content[%s], Time=[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
 #endif
 
 		//======执行服务调用==========================
