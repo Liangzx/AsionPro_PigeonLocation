@@ -242,7 +242,6 @@ private:
   //: 智能环上报位置信息
   void DoCommand_LocInfo(TCCustomUniSocket  &cusSocket);
 
-
 public:
 	TCString vender;
 private:

@@ -38,13 +38,26 @@ private:
 	
 	//: 指定 相关分区表的创建分区语句的文件名
 	map<TCString, TCString> m_ssTable_AddPartFileName;	//: 分区表名 --- 新增分区的语句文件名
-	
-	
+public:
+	void getTableCrtFileName(map<TCString, TCString> &ms_Table_FileName)
+	{
+		ms_Table_FileName.clear();
+		ms_Table_FileName = m_ssTable_InitCrtFileName;
+	}
+	// 获取 表的初始创建文件名列表-新增分区
+	void getAddPartFileName(map<TCString, TCString> &ms_Table_FileName)
+	{
+		ms_Table_FileName.clear();
+		ms_Table_FileName = m_ssTable_AddPartFileName;
+	}
+	TCString getTableSpace() {
+		return db_table_space;
+	}
 private:	
 	void LoadIniFile();
 	
 public:
-
+	TCString db_table_space;
 	TCPigeonLocationConfig();
 	~TCPigeonLocationConfig();  
   

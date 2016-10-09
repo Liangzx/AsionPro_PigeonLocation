@@ -158,9 +158,9 @@ void TCPigeonLocationPigeonGatherHandler::MsgParsing(const TCString & content, P
 	lsTrackerPkgList.CommaText(content, m_cDelimter);
 
 	pkg.pkg_gather_imei = lsTrackerPkgList[0];
-	pkg.pkg_gather_time = lsTrackerPkgList[1];
+	pkg.pkg_gather_time = lsTrackerPkgList[1].IsEmpty() ? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : pkg.pkg_gather_time;
 	pkg.pkg_gps_flag = lsTrackerPkgList[2];
-	pkg.pkg_beijing_time = TCTime::RelativeTime(lsTrackerPkgList[3], 8 * 3600);
+	pkg.pkg_beijing_time = lsTrackerPkgList[3].IsEmpty() ? TCTime::Now() : TCTime::RelativeTime(lsTrackerPkgList[3], 8 * 3600);
 	pkg.pkg_latitude = lsTrackerPkgList[4];
 	pkg.pkg_longitude = lsTrackerPkgList[5];
 	pkg.pkg_altitude = lsTrackerPkgList[6];
@@ -199,6 +199,10 @@ std::string TCPigeonLocationPigeonGatherHandler::JointPkgFields(
 		buf += rfid_infos[i].rfid_status_;
 		buf += ",";
 		buf += rfid_infos[i].bi_ringid_;
+		buf += ",";
+		buf += rfid_infos[i].rfid_type_;
+		buf += ",";
+		buf += rfid_infos[i].nestpad_imei_;
 		buf += ",";
 	}
 	return buf.substr(0, buf.length() - 1);
@@ -290,7 +294,7 @@ bool TCPigeonLocationPigeonGatherHandler::GetRFIDStatusRespInfo(std::vector<RFID
 	for (int i = 0; i < rfidstatusrespinfo.size(); i++) {
 		sql_buf.clear();
 		info.Clear();
-		sql_buf = "SELECT OWNERID,OWNERNAME,OWNERNAME_CHN,BI_RINGID,DORM_ID,DORM_ADDRESS";
+		sql_buf = "SELECT OWNERID,OWNERNAME,OWNERNAME_CHN,BI_RINGID,DORM_ID,DORM_ADDRESS, NESTPAD_IMEI";
 		sql_buf += " FROM ";
 		sql_buf += tb_name;
 		sql_buf += " WHERE IRING_RFID='";
@@ -305,15 +309,28 @@ bool TCPigeonLocationPigeonGatherHandler::GetRFIDStatusRespInfo(std::vector<RFID
 			otl_s >> rfidstatusrespinfo[i].bi_ringid_;
 			otl_s >> rfidstatusrespinfo[i].dorm_id_;
 			otl_s >> rfidstatusrespinfo[i].dorm_address_;
+			otl_s >> rfidstatusrespinfo[i].nestpad_imei_;
+			// 该rfid已报名
 			rfidstatusrespinfo[i].rfid_status_ = "1";
 		}	else {
 			null_num++;
 		}
 		otl_s.flush();
 		otl_s.close();
+
+		// 判定是否为智能环根据rfid查询RP_BZ_IRING有则为智能否则为普通
+		sql_buf.clear();
+		sql_buf = "select 1 from RP_BZ_IRING where IRING_RFID='";
+		sql_buf += rfidstatusrespinfo[i].rfid_;
+		sql_buf += "'";
+		otl_s.open(1, sql_buf.c_str(), m_dbConnect);
+		if (!otl_s.eof()) {
+			rfidstatusrespinfo[i].rfid_type_ = "1";
+		}
+		otl_s.flush();
+		otl_s.close();
 	}
 	if (null_num == rfidstatusrespinfo.size()) {
-		// TODO:如果上述的结果全部为空，那么需要从内存中查询该手机号码对应的机主鸽舍和用户ID信息
 		return false;
 	}
 	return true;
@@ -674,8 +691,11 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 					threshold_flag = 1;
 					//throw TCException(sLogMsg);
 				}
-			}
-			
+			}	else {
+				TCString s_log = "GATHER_DEV未找到对应的imei:" + pkg.pkg_gather_imei;
+				printf("%s", (char *)s_log);
+				glgMls->AddPigeonLocationRunLog(s_log);
+			}			
 
 			TCString resp_content = lsTrackerPkgList[9] + "," + lsTrackerPkgList[12];
 			SendRespPkg(cusSocket, TCString("33"), resp_content);
@@ -702,16 +722,18 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				std::string sql_buf = "SELECT 1 FROM RP_BZ_RACINGPIGEON WHERE IRING_RFID='";
 				sql_buf += info.rfid_;
 				sql_buf += "'";
-				otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
-				if (!otl_s.eof()) {
-					rfid_status_resp_infos.push_back(info);
-				}
-				otl_s.flush();
-				otl_s.close();
+				//otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
+				//if (!otl_s.eof()) {
+				//	rfid_status_resp_infos.push_back(info);
+				//}
+				rfid_status_resp_infos.push_back(info);
+				//otl_s.flush();
+				//otl_s.close();
 			}
 			TCString owner_id;
 			// 根据rfid保存需要查询的赛鸽信息
 			if (!GetRFIDStatusRespInfo(rfid_status_resp_infos)) {
+				// TODO:如果上述的结果全部为空，那么需要从内存中查询该手机号码对应的机主鸽舍和用户ID信息
 				/*
 				如果上述的结果全部为空，那么需要从内存中查询该手机号码对应的机主鸽舍和用户ID信息
 				获取到 OWNERID、OWNERNAME、OWNERNAME_CHN
@@ -719,9 +741,10 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				std::map<std::string, PigeonOwnerInfo>::iterator iter_pigeon_owner =
 					pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
 				if (iter_pigeon_owner == pigeon_owner_infos.end()) {
-					LoadRpBzPigeonOwner();					
+					LoadRpBzPigeonOwner();
+					iter_pigeon_owner = pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
 				}
-				iter_pigeon_owner =	pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
+				
 				if (iter_pigeon_owner != pigeon_owner_infos.end()) {
 						owner_id = (char *)iter_pigeon_owner->second.owner_id_.c_str();
 					}
@@ -734,6 +757,7 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			DORM_ID、DORM_NAME、DORM_ADDRESS、NESTPAD_ID、NESTPAD_INDEX、NESTPAD_IMEI
 			*/ 
 			std::vector<RpBzGatherNestPadInfo> nest_pad_infos;
+
 			GetRpBzGatherNestPadInfo((char *)owner_id,nest_pad_infos);
 			// 拼接报文			
 			std::string res_buf = JointPkgFields(nest_pad_infos, rfid_status_resp_infos);
@@ -757,8 +781,9 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			if (owner_iter == pigeon_owner_infos.end()) {
 				// 找不到重新加载
 				LoadRpBzPigeonOwner();
+				owner_iter = pigeon_owner_infos.find(moble);
 			}
-			owner_iter = pigeon_owner_infos.find(moble);
+			
 			if (owner_iter != pigeon_owner_infos.end()) {
 				owerinfo.Clear();
 				owerinfo.mobile_ = owner_iter->second.mobile_;
@@ -773,8 +798,9 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			if (dev_iter == gather_dev_infos.end()) {
 				// 重新加载
 				LoadRpBzGatherDev();
+				dev_iter = gather_dev_infos.find((char *)pkg.pkg_gather_imei);
 			}
-			dev_iter = gather_dev_infos.find((char *)pkg.pkg_gather_imei);
+			
 			if (dev_iter != gather_dev_infos.end()) {
 				devinfo.gatger_blemac_ = dev_iter->second.gatger_blemac_;
 				devinfo.gatger_id_ = dev_iter->second.gatger_id_;
@@ -868,14 +894,13 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrDevStatusMgr(const PigeonGat
 
 	// 找不到则重新加载一次到内存
 	std::map<std::string, GatherDevInfo>::iterator iter = gather_dev_infos.find((char *)pkg.pkg_gather_imei);
-	if (iter != gather_dev_infos.end()) {
-		gatger_id = iter->second.gatger_id_;
-	}	else {
+	if (iter == gather_dev_infos.end()) {
 		LoadRpBzGatherDev();
 		iter = gather_dev_infos.find((char *)pkg.pkg_gather_imei);
-		if (iter != gather_dev_infos.end()) {
-			gatger_id = iter->second.gatger_id_;
-		}
+	}
+
+	if (iter != gather_dev_infos.end()) {
+		gatger_id = iter->second.gatger_id_;
 	}
 
 	std::string tb_name = "RP_BR_DEVSTATUS_MGR";
@@ -894,8 +919,8 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrDevStatusMgr(const PigeonGat
 	sql_buf += ")";
 	sql_buf += "VALUES(";
 	sql_buf += ":f1DEV_TYPE<int>,";
-	sql_buf += ":f2DEV_ID<char[16]>,";
-	sql_buf += ":f3DEV_IMEI<char[16]>,";
+	sql_buf += ":f2DEV_ID<char[17]>,";
+	sql_buf += ":f3DEV_IMEI<char[17]>,";
 	sql_buf += ":f4DEV_LONGITUDE<double>,";
 	sql_buf += ":f5DEV_LATITUDE<double>,";
 	sql_buf += ":f6DEV_HIGH<int>,";
@@ -917,7 +942,7 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrDevStatusMgr(const PigeonGat
 	if (dev_status == 1) {
 		bs_time = (pkg.pkg_gps_flag == "1") ? pkg.pkg_beijing_time : TCTime::Now();
 	}	else if (dev_status == 2) {
-		bs_time = (pkg.pkg_beijing_time == "") ? pkg.pkg_gather_time : pkg.pkg_beijing_time;
+		bs_time = (pkg.pkg_beijing_time == "") ? TCTime::RelativeTime(pkg.pkg_gather_time, 8 * 3600) : pkg.pkg_beijing_time;
 	}	else {
 		;
 	}	
@@ -968,28 +993,28 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 	sql_buf += "THRESHOLD_FLAG";
 	sql_buf += ")";
 	sql_buf += "VALUES(";
-	sql_buf += ":f1MATCHID<char[16]>,";
+	sql_buf += ":f1MATCHID<char[33]>,";
 	sql_buf += ":f2MATCHNAME<char[256]>,";
-	sql_buf += ":f3OWNERID<char[16]>,";
+	sql_buf += ":f3OWNERID<char[17]>,";
 	sql_buf += ":f4OWNERNAME<char[32]>,";
 	sql_buf += ":f5OWNERNAME_CHN<char[32]>,";
-	sql_buf += ":f6BI_RINGID<char[16]>,";
+	sql_buf += ":f6BI_RINGID<char[17]>,";
 	sql_buf += ":f7SEX<short>,";
 	sql_buf += ":f8COLOR<short>,";
 	sql_buf += ":f9SANDEYE<short>,";
-	sql_buf += ":f10IRINGID<char[16]>,";
-	sql_buf += ":f11IRING_RFID<char[16]>,";
-	sql_buf += ":f12IRING_IMEI<char[16]>,";
-	sql_buf += ":f13IRING_BLEMAC<char[16]>,";
-	sql_buf += ":f14IRING_MOBILE<char[16]>,";
-	sql_buf += ":f15GATHERID<char[16]>,";
-	sql_buf += ":f16GATHER_IMEI<char[16]>,";
-	sql_buf += ":f17GATHER_BLEMAC<char[16]>,";
+	sql_buf += ":f10IRINGID<char[17]>,";
+	sql_buf += ":f11IRING_RFID<char[17]>,";
+	sql_buf += ":f12IRING_IMEI<char[17]>,";
+	sql_buf += ":f13IRING_BLEMAC<char[17]>,";
+	sql_buf += ":f14IRING_MOBILE<char[17]>,";
+	sql_buf += ":f15GATHERID<char[17]>,";
+	sql_buf += ":f16GATHER_IMEI<char[17]>,";
+	sql_buf += ":f17GATHER_BLEMAC<char[17]>,";
 	sql_buf += ":f18GATHER_LONGITUDE<double>,";
 	sql_buf += ":f19GATHER_LATITUDE<double>,";
 	sql_buf += ":f20GATHER_HIGH<int>,";
 	sql_buf += ":f21GATHER_TIME<timestamp>,";
-	sql_buf += ":f22GATHER_RFID_2STCRC<char[16]>,";
+	sql_buf += ":f22GATHER_RFID_2STCRC<char[17]>,";
 	sql_buf += ":f23VALID_FLAG<short>,";
 	sql_buf += ":f24THRESHOLD_FLAG<short>";
 	sql_buf += ")";
@@ -998,27 +1023,32 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 
 	short valid_flag = 1;
 	for (int i = 0; i < racing_pegeons.size(); i++) {
+		printf("TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc:match_id[%s]\n", dev_info.match_id_.c_str());
 		otl_s << dev_info.match_id_;
 		otl_s << dev_info.match_name_;
 		otl_s << racing_pegeons[i].owner_id;
 		otl_s << racing_pegeons[i].owner_name;
 		otl_s << racing_pegeons[i].ownername_chn;
+		
 		otl_s << racing_pegeons[i].bi_ringid;
 		otl_s << racing_pegeons[i].sex;
 		otl_s << racing_pegeons[i].color;
 		otl_s << racing_pegeons[i].sandeye;
 		otl_s << racing_pegeons[i].iringid;
+		
 		otl_s << racing_pegeons[i].rfid;
 		otl_s << racing_pegeons[i].iring_imei;
 		otl_s << racing_pegeons[i].iring_blemac;
 		otl_s << racing_pegeons[i].iring_mobile;
 		otl_s << dev_info.gatger_id_;
+		
 		otl_s << (char *)pkg.pkg_gather_imei;
 		otl_s << dev_info.gatger_blemac_;
 		otl_s << StrToFloat(pkg.pkg_longitude);
 		otl_s << StrToFloat(pkg.pkg_latitude);
 		otl_s << (int)StrToInt(pkg.pkg_altitude);
-		TCString bs_time = (pkg.pkg_beijing_time == "") ? pkg.pkg_gather_time : pkg.pkg_beijing_time;
+		
+		TCString bs_time = (pkg.pkg_beijing_time == "") ? TCTime::RelativeTime(pkg.pkg_gather_time, 8 * 3600) : pkg.pkg_beijing_time;
 		otl_datetime otl_d;		
 		if (String2OTLDateTime(bs_time, otl_d)) {
 			otl_s << otl_d;
@@ -1070,26 +1100,26 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBzRacingPigeon(const PigeonGat
 	sql_buf += "THRESHOLD_FLAG";
 	sql_buf += ")";
 	sql_buf += "VALUES(";
-	sql_buf += ":f01OWNERID<char[16]>,";
+	sql_buf += ":f01OWNERID<char[17]>,";
 	sql_buf += ":f02OWNERNAME<char[36]>,";
 	sql_buf += ":f03OWNERNAME_CHN<char[36]>,";
-	sql_buf += ":f04BI_RINGID<char[16]>,";
+	sql_buf += ":f04BI_RINGID<char[17]>,";
 	sql_buf += ":f05SEX<short>,";
 	sql_buf += ":f06COLOR<short>,";
 	sql_buf += ":f07SANDEYE<short>,";
-	sql_buf += ":f08IRINGID<char[16]>,";
-	sql_buf += ":f09IRING_RFID<char[16]>,";
-	sql_buf += ":f10IRING_IMEI<char[16]>,";
-	sql_buf += ":f11IRING_BLEMAC<char[16]>,";
-	sql_buf += ":f12IRING_MOBILE<char[16]>,";
-	sql_buf += ":f13IRING_IMSI<char[16]>,";
+	sql_buf += ":f08IRINGID<char[17]>,";
+	sql_buf += ":f09IRING_RFID<char[17]>,";
+	sql_buf += ":f10IRING_IMEI<char[17]>,";
+	sql_buf += ":f11IRING_BLEMAC<char[17]>,";
+	sql_buf += ":f12IRING_MOBILE<char[17]>,";
+	sql_buf += ":f13IRING_IMSI<char[17]>,";
 	sql_buf += ":f14FIT_TIME<timestamp>,";
 	sql_buf += ":f15FIT_MODEL<short>,";
-	sql_buf += ":f16NESTPAD_RFID_INITCRC<char[16]>,";
+	sql_buf += ":f16NESTPAD_RFID_INITCRC<char[17]>,";
 	sql_buf += ":f17FIT_DEV_TYPE<short>,";
-	sql_buf += ":f18FIT_DEV_ID<char[16]>,";
-	sql_buf += ":f19FIT_DEV_IMEI<char[16]>,";
-	sql_buf += ":f20FIT_DEV_BLEMAC<char[16]>,";
+	sql_buf += ":f18FIT_DEV_ID<char[17]>,";
+	sql_buf += ":f19FIT_DEV_IMEI<char[17]>,";
+	sql_buf += ":f20FIT_DEV_BLEMAC<char[17]>,";
 	sql_buf += ":f21FIT_DEV_LONGITUDE<double>,";
 	sql_buf += ":f22FIT_DEV_LATITUDE<double>,";
 	sql_buf += ":f23FIT_DEV_HIGH<int>,";
@@ -1118,7 +1148,7 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBzRacingPigeon(const PigeonGat
 
 		otl_datetime otl_d;
 		TCString time_tmp;
-		time_tmp = (pkg.pkg_beijing_time == "") ? pkg.pkg_gather_time : pkg.pkg_beijing_time;
+		time_tmp = (pkg.pkg_beijing_time == "") ? TCTime::RelativeTime(pkg.pkg_gather_time, 8 * 3600) : pkg.pkg_beijing_time;
 		if (String2OTLDateTime(time_tmp, otl_d)) {
 			otl_s << otl_d;
 		}	else {

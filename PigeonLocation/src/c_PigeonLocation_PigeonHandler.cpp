@@ -354,7 +354,6 @@ bool TCPigeonLocationPigeonHandler::CheckRpBrgatherSubproc(const PigeonPkg & pkg
 	
 	otl_stream otl_s;
 	otl_s.open(1, sql_buf.c_str(), m_dbConnect);
-	//otl_s >> info.matchid_;
 	if (otl_s.eof()) {
 		return false;
 	}	else {

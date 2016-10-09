@@ -64,7 +64,7 @@ int main(int argc, char* argv[]){
 			TCString sArgv_Str=argv[1];
 			if(sArgv_Str=="-v"){
 				printf("程序名称:PigeonLocation.bin\n");
-				printf("程序作用:人员定位信息采集\n");
+				printf("程序作用:会鸽定位\n");
     		printf("配置文件:~/config/PigeonLocation.ini\n");
     		printf("当前版本号:[%s]\n", (char*)VERSION);
     		exit(0);

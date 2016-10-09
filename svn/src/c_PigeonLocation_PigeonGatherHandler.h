@@ -1,7 +1,7 @@
 /*****************************************************************************
 CAPTION
 Project Name: 归巢系统--数据采集模块
-Description : 车载设备协议处理类
+Description : 集鸽设备协议处理类
 File Name   : C_PIGEONLOCATION_PIGEON_GATHER_HANDLER_H
 Requires    : LinuxAS3 , Oracle 9i
 Create Date : 2016-05-04
@@ -119,6 +119,8 @@ typedef struct RFIDStatusRespInfo {
 	std::string bi_ringid_;
 	std::string dorm_id_;
 	std::string dorm_address_;
+	std::string nestpad_imei_;	// rfid对应踏板imei
+	std::string rfid_type_;			// rfid 对应的环的类型 0普通/1智能
 	void Clear() {
 		rfid_ = "";
 		rfid_status_ = "0";
@@ -128,6 +130,8 @@ typedef struct RFIDStatusRespInfo {
 		bi_ringid_ = "";
 		dorm_id_ = "";
 		dorm_address_ = "";
+		nestpad_imei_ = "";
+		rfid_type_ = "0";
 	}
 }RFIDStatusRespInfo;
 // 信鸽补录信息

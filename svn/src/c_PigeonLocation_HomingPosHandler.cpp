@@ -84,6 +84,7 @@ bool TCPigeonLocationHomingPosHandler::Main_Handler(TCCustomUniSocket  &cusSocke
             glgMls->AddPigeonLocationRunLog(sLogMsg);
  			RecvRequest(cusSocket);
 			threshold_flag = 0;
+
  			DealRequest(cusSocket);	
  		}
  		cusSocket.Close();
@@ -152,10 +153,10 @@ void TCPigeonLocationHomingPosHandler::MsgParsing(const TCString & content, Homi
 		lsTrackerPkgList.CommaText(content, m_cDelimter);
 
 		pkg.pkg_imei = lsTrackerPkgList[0];
-		pkg.pkg_homing_pos_time = lsTrackerPkgList[1];
+		pkg.pkg_homing_pos_time = lsTrackerPkgList[1].IsEmpty() ? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[1];
 		pkg.pkg_gps_flag = lsTrackerPkgList[2];
 		pkg.pkg_beijing_time = lsTrackerPkgList[3] == "" ?
-			"" : TCTime::RelativeTime(lsTrackerPkgList[3], 8 * 3600);
+			TCTime::Now() : TCTime::RelativeTime(lsTrackerPkgList[3], 8 * 3600);
 		pkg.pkg_latitude = lsTrackerPkgList[4];
 		pkg.pkg_longitude = lsTrackerPkgList[5];
 		pkg.pkg_altitude = lsTrackerPkgList[6];
@@ -251,10 +252,13 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrDevStatusMgr(HomingPosPkg & pkg
 	std::map<std::string, RpBzNestPadInfo>::iterator nest_pad_iter;
 	nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
 	std::string nestpad_id = "";
+
+	//TODO:找不到需要重新加载
 	if (nest_pad_iter == bz_nest_pad_infos.end()) {
 		LoadRpBzNestPad();
+		nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
 	}
-	nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	
 	if (nest_pad_iter != bz_nest_pad_infos.end()) {
 		nestpad_id = nest_pad_iter->second.nestpad_id_;
 	}
@@ -275,8 +279,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrDevStatusMgr(HomingPosPkg & pkg
 	sql_buf += ")";
 	sql_buf += "VALUES(";
 	sql_buf += ":f1DEV_TYPE<int>,";
-	sql_buf += ":f2DEV_ID<char[16]>,";
-	sql_buf += ":f3DEV_IMEI<char[16]>,";
+	sql_buf += ":f2DEV_ID<char[17]>,";
+	sql_buf += ":f3DEV_IMEI<char[17]>,";
 	sql_buf += ":f4DEV_LONGITUDE<double>,";
 	sql_buf += ":f5DEV_LATITUDE<double>,";
 	sql_buf += ":f6DEV_HIGH<int>,";
@@ -297,7 +301,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrDevStatusMgr(HomingPosPkg & pkg
 	if (dev_status == 1) {
 		bs_time = (pkg.pkg_gps_flag == "1") ? pkg.pkg_beijing_time : TCTime::Now();
 	}	else if (dev_status == 2) {
-		bs_time = ((pkg.pkg_beijing_time).IsEmpty()) ? pkg.pkg_homing_pos_time : pkg.pkg_beijing_time;
+		bs_time = ((pkg.pkg_beijing_time).IsEmpty()) ? TCTime::RelativeTime(pkg.pkg_homing_pos_time, 8 * 3600) : pkg.pkg_beijing_time;
 	}
 	else {
 		;
@@ -334,18 +338,25 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	std::vector<BRGatherSubprocInfoWithChk> vec_brgathersubprocinfowithchk;
 	vec_brgathersubprocinfowithchk.clear();
 	BRGatherSubprocInfoWithChk brgathersubprocinfowithchk;
+	const short interval_tmp = 6;
 	if (msg_id == 13) {
 		for (int idx = 0; idx < rfid_num; idx++) {
 			brgathersubprocinfowithchk.Clear();
-			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[10 + 6 * idx].IsEmpty()
-				? "" : TCTime::RelativeTime(lsTrackerPkgList[10 + 6 * idx], 8 * 3600));
-			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[10 + 6 * idx].IsEmpty()
-				? "" : TCTime::RelativeTime(lsTrackerPkgList[11 + 6 * idx], 8 * 3600));
-			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[12 + 6 * idx];
-			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[13 + 6 * idx];
-			brgathersubprocinfowithchk.rfid_chk_1[14 + 6 * idx];
-			brgathersubprocinfowithchk.rfid_chk_2[15 + 6 * idx];
+			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
+				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[10 + interval_tmp * idx]);
+			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
+				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[11 + interval_tmp * idx]);
+			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[12 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[13 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_1 = lsTrackerPkgList[14 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_2 = lsTrackerPkgList[15 + interval_tmp * idx];
 			std::map<std::string, BRGatherSubprocInfo>::iterator iter_sub = br_gather_subproc_infos.find(brgathersubprocinfowithchk.rfid);
+			// 如果找不到则需要重新加载
+			if (iter_sub == br_gather_subproc_infos.end()) {
+				LoadRpBrGatherSubProc();
+				iter_sub = br_gather_subproc_infos.find(brgathersubprocinfowithchk.rfid);
+			}
+			
 			if (iter_sub != br_gather_subproc_infos.end()) {
 				brgathersubprocinfowithchk.info = iter_sub->second;
 				vec_brgathersubprocinfowithchk.push_back(brgathersubprocinfowithchk);
@@ -354,16 +365,23 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	}	else if (msg_id == 15) {
 		for (int idx = 0; idx < rfid_num; idx++) {
 			brgathersubprocinfowithchk.Clear();
-			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[10 + 6 * idx].IsEmpty()
-				? "" : TCTime::RelativeTime(lsTrackerPkgList[10 + 6 * idx], 8 * 3600));
-			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[10 + 6 * idx].IsEmpty()
-				? "" : TCTime::RelativeTime(lsTrackerPkgList[11 + 6 * idx], 8 * 3600));
-			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[15 + 6 * idx];
-			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[12 + 6 * idx];
-			brgathersubprocinfowithchk.rfid_chk_1[13 + 6 * idx];
-			brgathersubprocinfowithchk.rfid_chk_2[14 + 6 * idx];
+			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
+				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[10 + interval_tmp * idx]);
+			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
+				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[11 + interval_tmp * idx]);
+			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[15 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[12 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_1[13 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_2[14 + interval_tmp * idx];
 
 			std::map<std::string, BRGatherSubprocInfo>::iterator iter_sub = br_gather_subproc_infos.find(brgathersubprocinfowithchk.rfid);
+			//
+			if (iter_sub == br_gather_subproc_infos.end()) {
+				LoadRpBrGatherSubProc();
+				iter_sub = br_gather_subproc_infos.find(brgathersubprocinfowithchk.rfid);
+			}
+			
+			//
 			if (iter_sub != br_gather_subproc_infos.end()) {
 				brgathersubprocinfowithchk.info = iter_sub->second;
 				/*
@@ -414,8 +432,11 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	}
 
 	RpBzNestPadInfo pad_info;
-	std::map<std::string, RpBzNestPadInfo>::iterator iter_pad =
-		bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	std::map<std::string, RpBzNestPadInfo>::iterator iter_pad =	bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	if (iter_pad == bz_nest_pad_infos.end()) {
+		LoadRpBzNestPad();
+		iter_pad = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	}	
 	if (iter_pad != bz_nest_pad_infos.end()) {
 		pad_info = iter_pad->second;
 	}
@@ -461,31 +482,31 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[16]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
-	sql_buf += ":f03OWNERID<char[16]>,";
+	sql_buf += ":f03OWNERID<char[17]>,";
 	sql_buf += ":f04OWNERNAME<char[32]>,";
 	sql_buf += ":f05OWNERNAME_CHN<char[32]>,";
-	sql_buf += ":f06DORM_ID<char[16]>,";
+	sql_buf += ":f06DORM_ID<char[17]>,";
 	sql_buf += ":f07DORM_NAME<char[32]>,";
 	sql_buf += ":f08DORM_ADDRESS<char[256]>,";
 	sql_buf += ":f09DORM_LONGITUDE<double>,";
 	sql_buf += ":f10DORM_LATITUDE<double>,";
-	sql_buf += ":f11BI_RINGID<char[16]>,";
+	sql_buf += ":f11BI_RINGID<char[17]>,";
 	sql_buf += ":f12SEX<short>,";
 	sql_buf += ":f13COLOR<short>,";
 	sql_buf += ":f14SANDEYE<short>,";
-	sql_buf += ":f15IRINGID<char[16]>,";
-	sql_buf += ":f16IRING_RFID<char[16]>,";
-	sql_buf += ":f17IRING_IMEI<char[16]>,";
-	sql_buf += ":f18NESTPADID<char[16]>,";
-	sql_buf += ":f19NESTPAD_IMEI<char[16]>,";
-	sql_buf += ":f20NESTPAD_BLEMAC<char[16]>,";
+	sql_buf += ":f15IRINGID<char[17]>,";
+	sql_buf += ":f16IRING_RFID<char[17]>,";
+	sql_buf += ":f17IRING_IMEI<char[17]>,";
+	sql_buf += ":f18NESTPADID<char[17]>,";
+	sql_buf += ":f19NESTPAD_IMEI<char[17]>,";
+	sql_buf += ":f20NESTPAD_BLEMAC<char[17]>,";
 	sql_buf += ":f21NESTPAD_LONGITUDE<double>,";
 	sql_buf += ":f22NESTPAD_LATITUDE<double>,";
 	sql_buf += ":f23NESTPAD_HIGH<int>,";
-	sql_buf += ":f24NESTPAD_RFID_INITCRC<char[16]>,";
-	sql_buf += ":f25GATHER_RFID_2STCRC<char[16]>,";
+	sql_buf += ":f24NESTPAD_RFID_INITCRC<char[17]>,";
+	sql_buf += ":f25GATHER_RFID_2STCRC<char[17]>,";
 	sql_buf += ":f26VALID_FLAG<short>,";
 	sql_buf += ":f27NESTPAD_BACKTIME<timestamp>,";
 	sql_buf += ":f28NESTPAD_SNDTIME<timestamp>,";
@@ -528,6 +549,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 		time_tmp = (char *)((vec_brgathersubprocinfowithchk[i].gps_time).empty() 
 			? vec_brgathersubprocinfowithchk[i].homing_time 
 			: vec_brgathersubprocinfowithchk[i].gps_time).c_str();
+		// time_tmp
+		time_tmp = TCTime::RelativeTime(time_tmp, 8 * 3600);
 		otl_datetime otl_date;
 		if (String2OTLDateTime(time_tmp, otl_date)) {
 			otl_s << otl_date;
@@ -535,7 +558,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 			otl_s << otl_null();
 		}
 
-		time_tmp = (pkg.pkg_beijing_time).IsEmpty() ? pkg.pkg_homing_pos_time : pkg.pkg_beijing_time;
+		time_tmp = (pkg.pkg_beijing_time).IsEmpty() ? TCTime::RelativeTime(pkg.pkg_homing_pos_time, 8 * 3600) : pkg.pkg_beijing_time;
 
 		if (String2OTLDateTime(time_tmp, otl_date)) {
 			otl_s << otl_date;
@@ -563,6 +586,162 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	}
 	otl_s.flush();
 	otl_s.close();
+	/*
+	在收到归巢器发送的Back2NestIndicate报文后，在完成对报文的解析，并入库完成 RP_BR_NESTPAD_SUBPROC 表后
+	通过比赛ID关联 RP_BZ_MATCH 表，获取该比赛相关的实际开始时间等信息；然后计算成绩，入库到 RP_BR_MATCH_RESULT
+	*/ 
+	if (msg_id == 13) {
+		// TODO: 入表RP_BR_MATCH_RESULT
+		for (int i = 0; i < vec_brgathersubprocinfowithchk.size(); i++) {
+			sql_buf = "SELECT MATCHID, MATCHSTART_TIME,MATCHSTART_ADDRESS,MATCHSTART_LONGITUDE,MATCHSTART_LATITUDE ";
+			sql_buf += " FROM RP_BZ_MATCH where MATCHID='";
+			sql_buf += vec_brgathersubprocinfowithchk[i].info.matchid_;
+			sql_buf += "'";
+
+			std::string matchid;
+			otl_datetime matchstart_time;
+			std::string matchstart_address;
+			double matchstart_longitude;
+			double matchstart_latitude;
+			otl_s.open(1, sql_buf.c_str(), m_dbConnect);
+			if (!otl_s.eof())
+			{
+				otl_s >> matchid;
+				otl_s >> matchstart_time;
+				otl_s >> matchstart_address;
+				otl_s >> matchstart_longitude;
+				otl_s >> matchstart_latitude;
+			}
+			else
+			{
+				LOG_WRITE("RP_BZ_MATCH未找到对应的matchid.");
+				otl_s.close();
+				return;
+			}
+			otl_s.close();
+
+			// 归巢器监测到返回时间
+			TCString time_tmp;
+			time_tmp = (char *)((vec_brgathersubprocinfowithchk[i].gps_time).empty()
+				? vec_brgathersubprocinfowithchk[i].homing_time
+				: vec_brgathersubprocinfowithchk[i].gps_time).c_str();
+
+			time_tmp = TCTime::RelativeTime(time_tmp, 8 * 3600);
+
+			TCString matchstart_time_tc;
+			OTLDateTime2String(matchstart_time, matchstart_time_tc);
+			long interval_seconds = TCTime::SecondsAfter(matchstart_time_tc, time_tmp);
+			interval_seconds = interval_seconds < 0 ? -interval_seconds : interval_seconds;
+			// 获得距离km
+			double distance_d = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude), matchstart_latitude, matchstart_longitude);
+			// 计算速度
+			double speed = distance_d * 1000 / (interval_seconds / 60);
+			std::cout << "start time:" << (char *)matchstart_time_tc << "end time: time_tmp"
+				<< (char *)time_tmp << "seconds:" << interval_seconds << std::endl;
+			sql_buf = "INSERT INTO RP_BR_MATCH_RESULT";
+			sql_buf += "(";
+			sql_buf += "MATCHID,";
+			sql_buf += "MATCHNAME,";
+			sql_buf += "OWNERID,";
+			sql_buf += "OWNERNAME,";
+			sql_buf += "OWNERNAME_CHN,";
+			sql_buf += "DORM_ID,";
+			sql_buf += "DORM_NAME,";
+			sql_buf += "DORM_ADDRESS,";
+			sql_buf += "DORM_LONGITUDE,";
+			sql_buf += "DORM_LATITUDE,";
+			sql_buf += "BI_RINGID,";
+			sql_buf += "SEX,";
+			sql_buf += "COLOR,";
+			sql_buf += "SANDEYE,";
+			sql_buf += "IRINGID,";
+			sql_buf += "IRING_RFID,";
+			sql_buf += "IRING_IMEI,";
+			sql_buf += "MATCHSTART_TIME,";
+			sql_buf += "MATCHSTART_ADDRESS,";
+			sql_buf += "MATCHSTART_LONGITUDE,";
+			sql_buf += "MATCHSTART_LATITUDE,";
+			sql_buf += "NESTPAD_IMEI,";
+			sql_buf += "NESTPAD_BLEMAC,";
+			sql_buf += "NESTPAD_LONGITUDE,";
+			sql_buf += "NESTPAD_LATITUDE,";
+			sql_buf += "NESTPAD_HIGH,";
+			sql_buf += "NESTPAD_BACKTIME,";
+			sql_buf += "DISTANCE,";
+			sql_buf += "MINUTE_SPEED";
+			sql_buf += ")";
+			sql_buf += "VALUES(";
+			sql_buf += ":f01MATCHID<char[33]>,";
+			sql_buf += ":f02MATCHNAME<char[256]>,";
+			sql_buf += ":f03OWNERID<char[17]>,";
+			sql_buf += ":f04OWNERNAME<char[32]>,";
+			sql_buf += ":f05OWNERNAME_CHN<char[32]>,";
+			sql_buf += ":f06DORM_ID<char[17]>,";
+			sql_buf += ":f07DORM_NAME<char[32]>,";
+			sql_buf += ":f08DORM_ADDRESS<char[256]>,";
+			sql_buf += ":f09DORM_LONGITUDE<double>,";
+			sql_buf += ":f10DORM_LATITUDE<double>,";
+			sql_buf += ":f11BI_RINGID<char[17]>,";
+			sql_buf += ":f12SEX<short>,";
+			sql_buf += ":f13COLOR<short>,";
+			sql_buf += ":f14SANDEYE<short>,";
+			sql_buf += ":f15IRINGID<char[17]>,";
+			sql_buf += ":f16IRING_RFID<char[17]>,";
+			sql_buf += ":f17IRING_IMEI<char[17]>,";
+			sql_buf += ":f18MATCHSTART_TIME<timestamp>,";
+			sql_buf += ":f19MATCHSTART_ADDRESS<char[256]>,";
+			sql_buf += ":f20MATCHSTART_LONGITUDE<double>,";
+			sql_buf += ":f21MATCHSTART_LATITUDE<double>,";
+			sql_buf += ":f22NESTPAD_IMEI<char[17]>,";
+			sql_buf += ":f23NESTPAD_BLEMAC<char[17]>,";
+			sql_buf += ":f24NESTPAD_LONGITUDE<double>,";
+			sql_buf += ":f25NESTPAD_LATITUDE<double>,";
+			sql_buf += ":f26NESTPAD_HIGH<int>,";
+			sql_buf += ":f27NESTPAD_BACKTIME<timestamp>,";
+			sql_buf += ":f28DISTANCE<double>,";
+			sql_buf += ":f29MINUTE_SPEED<double>";
+			sql_buf += ")";
+
+			otl_s.open(1, sql_buf.c_str(), m_dbConnect);
+			otl_s << matchid;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.matchname_;
+			otl_s << pad_info.ownerid_;
+			otl_s << pad_info.ownername_;
+			otl_s << pad_info.ownername_chn_;
+			otl_s << pad_info.dorm_id_;
+			otl_s << pad_info.dorm_name_;
+			otl_s << pad_info.dorm_address_;
+			otl_s << pad_info.dorm_longitude_;
+			otl_s << pad_info.dorm_latitude_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.bi_ringid_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.sex_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.color_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.sandeye_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.iringid_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.iring_rfid_;
+			otl_s << vec_brgathersubprocinfowithchk[i].info.iring_imei_;
+			otl_s << matchstart_time;
+			otl_s << matchstart_address;
+			otl_s << matchstart_longitude;
+			otl_s << matchstart_latitude;
+			otl_s << (char *)pkg.pkg_imei;
+			otl_s << pad_info.nestpad_blemac_;
+			otl_s << StrToFloat(pkg.pkg_longitude);
+			otl_s << StrToFloat(pkg.pkg_latitude);
+			otl_s << (int)StrToInt(pkg.pkg_altitude);
+			otl_datetime otl_date;
+			if (String2OTLDateTime(time_tmp, otl_date)) {
+				otl_s << otl_date;
+			}
+			else {
+				otl_s << otl_null();
+			}
+			otl_s << distance_d;
+			otl_s << speed;
+
+			otl_s.close();
+		}
+	}	
 	__LEAVEFUNCTION;
 }
 
@@ -597,6 +776,11 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 		vedio_info.Clear();
 		vedio_info.rfid = lsTrackerPkgList[13 + i];
 		std::map<std::string, BRGatherSubprocInfo>::iterator iter_sub = br_gather_subproc_infos.find(vedio_info.rfid);
+		if (iter_sub == br_gather_subproc_infos.end()) {
+			LoadRpBrGatherSubProc();
+			iter_sub = br_gather_subproc_infos.find(vedio_info.rfid);
+		}
+		
 		if (iter_sub != br_gather_subproc_infos.end())	{
 			vedio_info.info = iter_sub->second;
 			nestvideoinfos.push_back(vedio_info);
@@ -604,21 +788,28 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 	}
 	//
 	RpBzNestPadInfo pad_info;
-	std::map<std::string, RpBzNestPadInfo>::iterator iter_pad =
-		bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	std::map<std::string, RpBzNestPadInfo>::iterator iter_pad =	bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	if (iter_pad == bz_nest_pad_infos.end()) {
+		LoadRpBzNestPad();
+		iter_pad = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	}
 	if (iter_pad != bz_nest_pad_infos.end()) {
 		pad_info = iter_pad->second;
 	}
 	// 入表
 	//  video_data
-	otl_long_string nestpad_video;
+	const long max_long_tring_len = vedio_size + 1024;
+	otl_long_string nestpad_video(max_long_tring_len);
 	nestpad_video.set_len(vedio_size);
+
+	m_dbConnect.set_max_long_size(max_long_tring_len);
+	
 	//
 	for (int i = 0; i < vedio_size; i++) {
 		//std::cout << "vedio_size" << vedio_size << "video_data:" << video_data[i] << std::endl;
 		nestpad_video[i] = video_data[i];
 	}
-	//
+	
 	otl_stream otl_s;
 	std::string tb_name = "RP_BR_NESTVIDEO_SUBPROC";
 	std::string sql_buf;
@@ -667,24 +858,24 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[16]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
-	sql_buf += ":f03OWNERID<char[16]>,";
+	sql_buf += ":f03OWNERID<char[17]>,";
 	sql_buf += ":f04OWNERNAME<char[32]>,";
 	sql_buf += ":f05OWNERNAME_CHN<char[32]>,";
-	sql_buf += ":f06DORM_ID<char[16]>,";
+	sql_buf += ":f06DORM_ID<char[17]>,";
 	sql_buf += ":f07DORM_NAME<char[32]>,";
 	sql_buf += ":f08DORM_ADDRESS<char[256]>,";
 	sql_buf += ":f09DORM_LONGITUDE<double>,";
 	sql_buf += ":f10DORM_LATITUDE<double>,";
-	sql_buf += ":f11NESTPADID<char[16]>,";
-	sql_buf += ":f12NESTPAD_IMEI<char[16]>,";
-	sql_buf += ":f13NESTPAD_BLEMAC<char[16]>,";
+	sql_buf += ":f11NESTPADID<char[17]>,";
+	sql_buf += ":f12NESTPAD_IMEI<char[17]>,";
+	sql_buf += ":f13NESTPAD_BLEMAC<char[17]>,";
 	sql_buf += ":f14NESTPAD_LONGITUDE<double>,";
 	sql_buf += ":f15NESTPAD_LATITUDE<double>,";
 	sql_buf += ":f16NESTPAD_HIGH<int>,";
 	sql_buf += ":f17VALID_FLAG<short>,";
-	sql_buf += ":f18VIDEO_ID<char[16]>,";
+	sql_buf += ":f18VIDEO_ID<char[17]>,";
 	sql_buf += ":f19NESTPAD_CONTENTTIME<timestamp>,";
 	sql_buf += ":f20NESTPAD_SNDTIME<timestamp>,";
 	sql_buf += ":f21NESTPAD_RECVTIME<timestamp>,";
@@ -718,12 +909,13 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 		otl_s << (char *)IntToStr(cur_seq);
 		otl_datetime otl_dt;
 		TCString time_tmp = (char *)(vedio_mode_time_gps.empty() ? vedio_mode_time : vedio_mode_time_gps).c_str();
+		time_tmp = TCTime::RelativeTime(time_tmp, 8 * 3600);
 		if (String2OTLDateTime(time_tmp, otl_dt)) {
 			otl_s << otl_dt;
 		}	else {
 			otl_s << otl_null();
 		}
-		time_tmp = pkg.pkg_beijing_time.IsEmpty() ? pkg.pkg_homing_pos_time : pkg.pkg_beijing_time;
+		time_tmp = pkg.pkg_beijing_time.IsEmpty() ? TCTime::RelativeTime(pkg.pkg_homing_pos_time, 8 * 3600) : pkg.pkg_beijing_time;
 		if (String2OTLDateTime(time_tmp, otl_dt)) {
 			otl_s << otl_dt;
 		}
@@ -785,6 +977,11 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrPigeonNestVideo(const TCString 
 		vedio_info.Clear();
 		vedio_info.rfid = lsTrackerPkgList[13 + i];
 		std::map<std::string, BRGatherSubprocInfo>::iterator iter_sub = br_gather_subproc_infos.find(vedio_info.rfid);
+		if (iter_sub == br_gather_subproc_infos.end()) {
+			LoadRpBrGatherSubProc();
+			iter_sub = br_gather_subproc_infos.find(vedio_info.rfid);
+		}
+		
 		if (iter_sub != br_gather_subproc_infos.end()) {
 			vedio_info.info = iter_sub->second;
 			nestvideoinfos.push_back(vedio_info);
@@ -793,6 +990,9 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrPigeonNestVideo(const TCString 
 	//
 	RpBzNestPadInfo pad_info;
 	std::map<std::string, RpBzNestPadInfo>::iterator iter_pad =	bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	if (iter_pad == bz_nest_pad_infos.end()) {
+		iter_pad = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	}
 	if (iter_pad != bz_nest_pad_infos.end()) {
 		pad_info = iter_pad->second;
 	}
@@ -853,30 +1053,30 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrPigeonNestVideo(const TCString 
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[16]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
-	sql_buf += ":f03OWNERID<char[16]>,";
+	sql_buf += ":f03OWNERID<char[17]>,";
 	sql_buf += ":f04OWNERNAME<char[32]>,";
 	sql_buf += ":f05OWNERNAME_CHN<char[32]>,";
-	sql_buf += ":f06DORM_ID<char[16]>,";
+	sql_buf += ":f06DORM_ID<char[17]>,";
 	sql_buf += ":f07DORM_NAME<char[32]>,";
 	sql_buf += ":f08DORM_ADDRESS<char[256]>,";
 	sql_buf += ":f09DORM_LONGITUDE<double>,";
 	sql_buf += ":f10DORM_LATITUDE<double>,";
-	sql_buf += ":f11BI_RINGID<char[16]>,";
+	sql_buf += ":f11BI_RINGID<char[17]>,";
 	sql_buf += ":f12SEX<short>,";
 	sql_buf += ":f13COLOR<short>,";
 	sql_buf += ":f14SANDEYE<short>,";
-	sql_buf += ":f15IRINGID<char[16]>,";
-	sql_buf += ":f16IRING_RFID<char[16]>,";
-	sql_buf += ":f17IRING_IMEI<char[16]>,";
-	sql_buf += ":f18NESTPADID<char[16]>,";
-	sql_buf += ":f19NESTPAD_IMEI<char[16]>,";
-	sql_buf += ":f20NESTPAD_BLEMAC<char[16]>,";
+	sql_buf += ":f15IRINGID<char[17]>,";
+	sql_buf += ":f16IRING_RFID<char[17]>,";
+	sql_buf += ":f17IRING_IMEI<char[17]>,";
+	sql_buf += ":f18NESTPADID<char[17]>,";
+	sql_buf += ":f19NESTPAD_IMEI<char[17]>,";
+	sql_buf += ":f20NESTPAD_BLEMAC<char[17]>,";
 	sql_buf += ":f21NESTPAD_LONGITUDE<double>,";
 	sql_buf += ":f22NESTPAD_LATITUDE<double>,";
 	sql_buf += ":f23NESTPAD_HIGH<int>,";
-	sql_buf += ":f24VIDEO_ID<char[16]>,";
+	sql_buf += ":f24VIDEO_ID<char[17]>,";
 	sql_buf += ":f25VALID_FLAG<short>,";
 	sql_buf += ":f26NESTPAD_CONTENTTIME<timestamp>,";
 	sql_buf += ":f27NESTPAD_SNDTIME<timestamp>,";
@@ -916,13 +1116,14 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrPigeonNestVideo(const TCString 
 
 		otl_datetime otl_dt;
 		TCString time_tmp = (char *)(vedio_mode_time_gps.empty() ? vedio_mode_time : vedio_mode_time_gps).c_str();
+		time_tmp = TCTime::RelativeTime(time_tmp, 8 * 3600);
 		if (String2OTLDateTime(time_tmp, otl_dt)) {
 			otl_s << otl_dt;
 		}
 		else {
 			otl_s << otl_null();
 		}
-		time_tmp = pkg.pkg_beijing_time.IsEmpty() ? pkg.pkg_homing_pos_time : pkg.pkg_beijing_time;
+		time_tmp = pkg.pkg_beijing_time.IsEmpty() ? TCTime::RelativeTime(pkg.pkg_homing_pos_time, 8 * 3600) : pkg.pkg_beijing_time;
 		if (String2OTLDateTime(time_tmp, otl_dt)) {
 			otl_s << otl_dt;
 		}
@@ -1001,6 +1202,9 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 	//
 	RpBzNestPadInfo pad_info;
 	std::map<std::string, RpBzNestPadInfo>::iterator iter_pad = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	if (iter_pad == bz_nest_pad_infos.end()) {
+		iter_pad = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+	}
 	if (iter_pad != bz_nest_pad_infos.end()) {
 		pad_info = iter_pad->second;
 	}
@@ -1048,37 +1252,37 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01OWNERID<char[16]>,";
+	sql_buf += ":f01OWNERID<char[17]>,";
 	sql_buf += ":f02OWNERNAME<char[32]>,";
 	sql_buf += ":f03OWNERNAME_CHN<char[32]>,";
-	sql_buf += ":f04DORM_ID<char[16]>,";
+	sql_buf += ":f04DORM_ID<char[17]>,";
 	sql_buf += ":f05DORM_NAME<char[32]>,";
 	sql_buf += ":f06DORM_ADDRESS<char[256]>,";
 	sql_buf += ":f07DORM_LONGITUDE<double>,";
 	sql_buf += ":f08DORM_LATITUDE<double>,";
-	sql_buf += ":f09NESTPAD_ID<char[16]>,";
-	sql_buf += ":f10NESTPAD_IMEI<char[16]>,";
-	sql_buf += ":f11NESTPAD_BLEMAC<char[16]>,";
+	sql_buf += ":f09NESTPAD_ID<char[17]>,";
+	sql_buf += ":f10NESTPAD_IMEI<char[17]>,";
+	sql_buf += ":f11NESTPAD_BLEMAC<char[17]>,";
 	sql_buf += ":f12NESTPAD_LONGITUDE<double>,";
 	sql_buf += ":f13NESTPAD_LATITUDE<double>,";
 	sql_buf += ":f14NESTPAD_HIGH<int>,";
-	sql_buf += ":f15BI_RINGID<char[16]>,";
+	sql_buf += ":f15BI_RINGID<char[17]>,";
 	sql_buf += ":f16SEX<short>,";
 	sql_buf += ":f17COLOR<short>,";
 	sql_buf += ":f18SANDEYE<short>,";
-	sql_buf += ":f19IRINGID<char[16]>,";
-	sql_buf += ":f20IRING_RFID<char[16]>,";
-	sql_buf += ":f21IRING_IMEI<char[16]>,";
-	sql_buf += ":f22IRING_BLEMAC<char[16]>,";
-	sql_buf += ":f23IRING_MOBILE<char[16]>,";
-	sql_buf += ":f24IRING_IMSI<char[16]>,";
+	sql_buf += ":f19IRINGID<char[17]>,";
+	sql_buf += ":f20IRING_RFID<char[17]>,";
+	sql_buf += ":f21IRING_IMEI<char[17]>,";
+	sql_buf += ":f22IRING_BLEMAC<char[17]>,";
+	sql_buf += ":f23IRING_MOBILE<char[17]>,";
+	sql_buf += ":f24IRING_IMSI<char[17]>,";
 	sql_buf += ":f25FIT_TIME<timestamp>,";
 	sql_buf += ":f26FIT_MODEL<short>,";
-	sql_buf += ":f27NESTPAD_RFID_INITCRC<char[16]>,";
+	sql_buf += ":f27NESTPAD_RFID_INITCRC<char[17]>,";
 	sql_buf += ":f28FIT_DEV_TYPE<short>,";
-	sql_buf += ":f29FIT_DEV_ID<char[16]>,";
-	sql_buf += ":f30FIT_DEV_IMEI<char[16]>,";
-	sql_buf += ":f31FIT_DEV_BLEMAC<char[16]>,";
+	sql_buf += ":f29FIT_DEV_ID<char[17]>,";
+	sql_buf += ":f30FIT_DEV_IMEI<char[17]>,";
+	sql_buf += ":f31FIT_DEV_BLEMAC<char[17]>,";
 	sql_buf += ":f32FIT_DEV_LONGITUDE<double>,";
 	sql_buf += ":f33FIT_DEV_LATITUDE<double>,";
 	sql_buf += ":f34FIT_DEV_HIGH<int>,";
@@ -1116,7 +1320,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 		otl_datetime otl_dt;
 		// 业务时间
 		TCString ts_time;
-		ts_time = pkg.pkg_beijing_time.IsEmpty() ? pkg.pkg_homing_pos_time : pkg.pkg_beijing_time;
+		ts_time = pkg.pkg_beijing_time.IsEmpty() ? TCTime::RelativeTime(pkg.pkg_homing_pos_time, 8 * 3600) : pkg.pkg_beijing_time;
 		if (String2OTLDateTime(ts_time, otl_dt)) {
 			otl_s << otl_dt;
 		}
@@ -1150,8 +1354,9 @@ bool TCPigeonLocationHomingPosHandler::CheckDistance(TCCustomUniSocket & cusSock
 	//找不到重新加载
 	if (nest_pad_iter == bz_nest_pad_infos.end()) {
 		LoadRpBzNestPad();
+		nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
 	}
-	nest_pad_iter = bz_nest_pad_infos.find((char *)pkg.pkg_imei);
+
 	if (nest_pad_iter != bz_nest_pad_infos.end()) {
 		double distance_homing_pos_pkg = get_distance(StrToFloat(pkg.pkg_latitude),
 			StrToFloat(pkg.pkg_longitude),
@@ -1463,6 +1668,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			//
 			// 入库 RP_BR_NESTPAD_SUBPROC 处理
 			OutputRpBrNestPadSubproc(m_sPkg_Content, pkg, 13);
+			// Back2NestIndicate报文后，在完成对报文的解析，并入库完成 RP_BR_NESTPAD_SUBPROC 
 			//RP_BR_DEVSTATUS_MGR
 			OutputRpBrDevStatusMgr(pkg, 1, 2);
 		}	else if (msg_id == "14") {
@@ -1501,10 +1707,14 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			//			
 			int rlen = 0;
 			// 接收相应长度的视频数据
+			long total = 0;
 			for (int len = flame_total_size; len; len = len - rlen)
 			{
 				rlen = cusSocket.ReceiveBuf(flame_ptr + rlen, len);
+				total += rlen;
+				std::cout << "total recv:" << total << " current recv:" << rlen << std::endl;
 			}
+			std::cout << "should recv:" << flame_total_size << " total recv :" << total << std::endl;
 			// 接收结束字符",TA"
 			char ch[3] = {0};
 	
@@ -1526,7 +1736,11 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			OutputRpBrNestVideoSubproc(m_sPkg_Content, pkg, flame_ptr, flame_total_size);
 
 			////视频输出到文件
+
 			std::fstream iof("./vedio_check", std::ios::ate|std::ios::out|std::ios::binary);
+			if (iof.fail()) {
+				perror("open ./vedio_check fail:");
+			}
 			iof.write(flame_ptr, flame_total_size);
 			iof.close();
 			delete[] flame_ptr;

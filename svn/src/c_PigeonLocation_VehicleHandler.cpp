@@ -154,9 +154,9 @@ void TCPigeonLocationVehicleHandler::MsgParsing(const TCString & content, Vehicl
 	std::cout << "PKG:" << m_sPkg_Content << std::endl;
 	std::cout << "数据包时间偏移:" << (char *)pkg.pkg_pkg_offset <<
 		"海拔高度:" << (char *)pkg.pkg_altitude << std::endl;
-	//----2016-09-23--临时入表----
-	std::string sql_buf = "insert into mb_bss_terminal_location(day, imei, longitude, latitude, ACTIVE_TIME, LOCATION_TYPE)";
-	sql_buf += "values(:f0day<timestamp>, :f1imei<char[17]>, :f2longitude<char[31]>, :f3latitude<char[31]>,sysdate, '0')";
+	//----2016-09-23--入表----
+	std::string sql_buf = "insert into mb_bss_terminal_location(day, imei, longitude, latitude, ACTIVE_TIME, LOCATION_TYPE, ELECTRICITY)";
+	sql_buf += "values(:f0day<timestamp>, :f1imei<char[17]>, :f2longitude<char[31]>, :f3latitude<char[31]>,sysdate, '0', :f4electricity<char[7]>)";
 	TCString day = TCTime::Today();
 	if (day.GetLength() == 8) {
 		day += "000000";
@@ -169,8 +169,10 @@ void TCPigeonLocationVehicleHandler::MsgParsing(const TCString & content, Vehicl
 		ot_s << (char *)pkg.pkg_imei;
 		ot_s << (char *)pkg.pkg_longitude;
 		ot_s << (char *)pkg.pkg_latitude;
+		ot_s << (char *)pkg.pkg_voltage;
 		ot_s.close();
 	}
+	LOG_WRITE("longitude:%s,latitude:%s", (char *)pkg.pkg_longitude, (char *)pkg.pkg_latitude);
 	//----
 }
 
@@ -498,11 +500,11 @@ void TCPigeonLocationVehicleHandler::OutputRpBrJudgeSubproc(const VehiclePkg & p
 	sql_buf += "MONITOR_HIGH)";
 	//sql_buf += "MONITOR_CONTENT)";
 	sql_buf += "VALUES(";
-	sql_buf += ":f1MATCHID<char[256]>,";
+	sql_buf += ":f1MATCHID<char[33]>,";
 	sql_buf += ":f2MATCHNAME<char[256]>,";
 	sql_buf += ":f3MONITOR_TYPE<short>,";
-	sql_buf += ":f4MONITOR_ID<char[16]>,";
-	sql_buf += ":f5MONITOR_IMEI<char[16]>,";
+	sql_buf += ":f4MONITOR_ID<char[17]>,";
+	sql_buf += ":f5MONITOR_IMEI<char[17]>,";
 	sql_buf += ":f6MONITOR_SNDTIME<TIMESTAMP>,";
 	sql_buf += ":f7MONITOR_RECVTIME<TIMESTAMP>,";
 	sql_buf += ":f8MONITOR_RECORDTIME<TIMESTAMP>,";
@@ -576,8 +578,8 @@ void TCPigeonLocationVehicleHandler::OutputRpBrDevStatusMgr(const VehiclePkg & p
 	sql_buf += "THRESHOLD_FLAG)";
 	sql_buf += "VALUES(";
 	sql_buf += ":f1DEV_TYPE<int>,";
-	sql_buf += ":f2DEV_ID<char[16]>,";
-	sql_buf += ":f3DEV_IMEI<char[16]>,";
+	sql_buf += ":f2DEV_ID<char[17]>,";
+	sql_buf += ":f3DEV_IMEI<char[17]>,";
 	sql_buf += ":f4DEV_LONGITUDE<double>,";
 	sql_buf += ":f5DEV_LATITUDE<double>,";
 	sql_buf += ":f6DEV_HIGH<int>,";

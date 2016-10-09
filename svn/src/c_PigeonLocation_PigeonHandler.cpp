@@ -91,12 +91,21 @@ bool TCPigeonLocationPigeonHandler::Main_Handler(TCCustomUniSocket  &cusSocket) 
 		m_nTimeOut = 60;
 
 		printf("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n", (char*)cusSocket.GetRemoteAddress(), cusSocket.GetRemotePort(), m_nTimeOut);
-
+		// 自动建表和分区
+		TCString tdy = TCTime::Today();
+		autoCreateTable(tdy);
+		autoAddPartion(tdy);
 		//: 长连接方式
 		while (1) {			
 			Init();
 			TCString sLogMsg = "Time:Now=[" + TCTime::Now() + "],Recv Port=[" + IntToStr(cusSocket.GetRemotePort()) + "] Data";
 			glgMls->AddPigeonLocationRunLog(sLogMsg);
+			// 自动创建分区
+			if (tdy != TCTime::Today()) {
+				tdy = TCTime::Today();
+				autoAddPartion(tdy);
+			}
+
 			RecvRequest(cusSocket);
 			threshold_flag = 0;
 			DealRequest(cusSocket);
@@ -161,6 +170,133 @@ void TCPigeonLocationPigeonHandler::DealRequest(TCCustomUniSocket  &cusSocket) {
 	}
 }
 
+bool TCPigeonLocationPigeonHandler::autoCreateTable(TCString sDay)
+{
+	__ENTERFUNCTION;
+	map<TCString, TCString> msInitTable_SQLFileName;
+	msInitTable_SQLFileName.clear();
+	// 从配置文件中读取相关表
+	gPigeonLocationConfig->getTableCrtFileName(msInitTable_SQLFileName);
+	//  遍历，如果该表不存在，那么进行新建
+	map<TCString, TCString>::iterator ITR_TempSQL;
+	TCString tbspace;
+	tbspace = gPigeonLocationConfig->getTableSpace();
+	for (ITR_TempSQL = msInitTable_SQLFileName.begin(); ITR_TempSQL != msInitTable_SQLFileName.end(); ITR_TempSQL++)
+	{
+		TCString sTableName = ITR_TempSQL->first;
+		//if (UpperCase(sTableName) != UpperCase(tb_name_))
+		//{
+		//	continue;
+		//}
+		// 检查该表是否存在;
+		if (!CheckTableExist(m_dbConnect, sTableName))
+		{
+			// 需要新建表
+			map<TCString, TCString> msFieldReplaceValue;
+			msFieldReplaceValue.clear();
+
+			// 格式化时间
+			TCString sNextDay = TCTime::RelativeDate(sDay, 1);
+			TCString sFormated_Day = Mid(sNextDay, 1, 4) + "-" + Mid(sNextDay, 5, 2) + "-" + Mid(sNextDay, 7, 2);
+			msFieldReplaceValue["YYYY-MM-DD"] = sFormated_Day;
+
+			//modification
+			msFieldReplaceValue["YYYYMMDD"] = sDay;
+			msFieldReplaceValue["$DB_TABLE_SPACE"] = tbspace;
+
+			// 新建表
+			if (!AutoCreateTable(m_dbConnect, ITR_TempSQL->second, msFieldReplaceValue))
+			{
+				TCString sLog = "[" + sTableName + "]表创建失败";
+				glgMls->AddPigeonLocationRunLog(sLog);
+				exit(0);
+			}
+			TCString sLog = sTableName + " 表在数据库中不存在，需要创建";
+			glgMls->AddPigeonLocationRunLog(sLog);
+		}
+	}
+	return true;
+	__LEAVEFUNCTION;
+	return false;
+}
+
+bool TCPigeonLocationPigeonHandler::autoAddPartion(TCString sDay)
+{
+	__ENTERFUNCTION;
+	// 从配置文件中读取相关表
+	map<TCString, TCString> msAddPart_SQLFileName;
+	msAddPart_SQLFileName.clear();
+	gPigeonLocationConfig->getAddPartFileName(msAddPart_SQLFileName);
+	TCString sLog;
+	// 格式化时间
+	TCString sNextDay = TCTime::RelativeDate(sDay, 1);
+	// 遍历，获取该表的最大分区Pos以及日期
+	map<TCString, TCString>::iterator ITR_TempSQL;
+	for (ITR_TempSQL = msAddPart_SQLFileName.begin(); ITR_TempSQL != msAddPart_SQLFileName.end(); ITR_TempSQL++)
+	{
+		TCString sTableName = ITR_TempSQL->first;
+		//if (UpperCase(sTableName) != UpperCase(tb_name_))
+		//{
+		//	continue;
+		//}
+		// 获取该分区表的最大分区的日期 HIGH_VALUE 字段的值;
+		TCString sMax_HighValue;
+		if (GetMaxPart_HighValue(m_dbConnect, sTableName, sMax_HighValue))
+		{
+			// 获取成功了
+			sLog = "获取表[" + sTableName + "]的最大分区值[" + sMax_HighValue + "]";
+			glgMls->AddPigeonLocationRunLog(sLog);
+		}
+		else
+		{
+			sLog = "FATAL:获取表[" + sTableName + "]的最大分区值失败";
+			glgMls->AddPigeonLocationRunLog(sLog);
+			exit(0);
+		}
+		int nPos = AT(sMax_HighValue, "-");
+		if (nPos < 5)
+		{
+			sLog = "FATAL:获取表[" + sTableName + "]的最大分区值是一个错误的日期格式，该分区表可能不是用时间分区的";
+			glgMls->AddPigeonLocationRunLog(sLog);
+			exit(0);
+		}
+		TCString sMax_Partition_Day = Mid(sMax_HighValue, nPos - 4, 4) + Mid(sMax_HighValue, nPos + 1, 2) + Mid(sMax_HighValue, nPos + 4, 2);
+
+		// 如果当前系统产生的分区已经达到了1天之后了，那么新增1天之后的分区
+		TCString sCurPartion_Timer = sMax_Partition_Day;
+		while (sCurPartion_Timer < TCTime::RelativeDate(sDay, 1))
+		{
+			TCString sTempCurPartion_Day = sCurPartion_Timer;
+			sCurPartion_Timer = TCTime::RelativeDate(sCurPartion_Timer, 1);
+			TCString sFormated_Day = Mid(sCurPartion_Timer, 1, 4) + "-" + Mid(sCurPartion_Timer, 5, 2) + "-" + Mid(sCurPartion_Timer, 7, 2);
+			map<TCString, TCString> msFieldReplaceValue;
+			msFieldReplaceValue.clear();
+			msFieldReplaceValue["YYYY-MM-DD"] = sFormated_Day;
+			msFieldReplaceValue["$DB_TABLE_SPACE"] = gPigeonLocationConfig->getTableSpace();
+			msFieldReplaceValue["YYYYMMDD"] = sTempCurPartion_Day;
+			sLog = "当前工作的文件日期为[" + sTempCurPartion_Day + "], 需要创建表[" + sTableName + "]的新分区: CurMaxPartition=[" + sCurPartion_Timer + "]\n";
+			sLog += "\t时间占位符[YYYY-MM-DD], 替换日期[" + sFormated_Day + "]\n";
+			sLog += "\t表空间占位符[YYYYMMDD], 替换日期[" + sTempCurPartion_Day + "]\n";
+			sLog += "\t表空间占位符[$DB_TABLE_SPACE], 替换=[" + gPigeonLocationConfig->getTableSpace() + "]\n";
+
+			glgMls->AddPigeonLocationRunLog(sLog);
+
+			// 新增分区信息
+			if (!AutoCreateTable(m_dbConnect, ITR_TempSQL->second, msFieldReplaceValue))
+			{
+				sLog = "FATAL:[" + sTableName + "]表新增分区[" + sCurPartion_Timer + "]失败";
+				glgMls->AddPigeonLocationRunLog(sLog);
+				exit(0);
+			}
+			sLog = "[" + sTableName + "]表新增分区[" + sCurPartion_Timer + "] 当前分区保留[" + sCurPartion_Timer + "]之前的数据, 新增分区完成";
+			glgMls->AddPigeonLocationRunLog(sLog);
+		}
+	}
+	return true;
+	__LEAVEFUNCTION;
+	return false;
+}
+
 void TCPigeonLocationPigeonHandler::GetDelay(const PigeonPkg pkg, TimeDelay & time_delay)
 {
 	__ENTERFUNCTION;
@@ -194,7 +330,8 @@ void TCPigeonLocationPigeonHandler::GetNestPadLoc(const PigeonPkg & pkg, double 
 	sql_buf += " WHERE A.IRING_IMEI='";
 	sql_buf += pkg.pkg_imei;
 	sql_buf += "'";
-	otl_stream otl_s(10, sql_buf.c_str(), m_dbConnect);	
+	sql_buf += " order by fit_time desc";
+	otl_stream otl_s(10, sql_buf.c_str(), m_dbConnect);
 	if (!otl_s.eof()) {	
 		otl_s >> latitude;
 		otl_s >> longitude;
@@ -217,7 +354,7 @@ bool TCPigeonLocationPigeonHandler::CheckRpBrgatherSubproc(const PigeonPkg & pkg
 	
 	otl_stream otl_s;
 	otl_s.open(1, sql_buf.c_str(), m_dbConnect);
-	otl_s >> info.matchid_;
+	//otl_s >> info.matchid_;
 	if (otl_s.eof()) {
 		return false;
 	}	else {
@@ -331,9 +468,9 @@ void TCPigeonLocationPigeonHandler::MsgParsing(const TCString & content, PigeonP
 		lev.rx_lev_ = lsTrackerPkgList[10 + 3 * i];
 		lac_ci_rxlev.push_back(lev);
 	}
-	//----2016-09-23--临时入表----
-	std::string sql_buf = "insert into mb_bss_terminal_location(day, imei, longitude, latitude, ACTIVE_TIME, LOCATION_TYPE)";
-	sql_buf += "values(:f0day<timestamp>, :f1imei<char[17]>, :f2longitude<char[31]>, :f3latitude<char[31]>,sysdate, '0')";
+	//----2016-09-23--入表----
+	std::string sql_buf = "insert into mb_bss_terminal_location(day, imei, longitude, latitude, ACTIVE_TIME, LOCATION_TYPE, ELECTRICITY)";
+	sql_buf += "values(:f0day<timestamp>, :f1imei<char[17]>, :f2longitude<char[31]>, :f3latitude<char[31]>,sysdate, '0', :f4electricity<char[7]>)";
 	TCString day = TCTime::Today();
 	if (day.GetLength() == 8) {
 		day += "000000";
@@ -346,6 +483,7 @@ void TCPigeonLocationPigeonHandler::MsgParsing(const TCString & content, PigeonP
 		ot_s << (char *)pkg.pkg_imei;
 		ot_s << (char *)pkg.pkg_longitude;
 		ot_s << (char *)pkg.pkg_latitude;
+		ot_s << (char *)pkg.pkg_voltage;
 		ot_s.close();
 	}
 	LOG_WRITE("longitude:%s,latitude:%s", (char *)pkg.pkg_longitude, (char *)pkg.pkg_latitude);
@@ -402,17 +540,17 @@ void TCPigeonLocationPigeonHandler::OutputRpBrRealLocation(PigeonPkg & pkg,
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
-	sql_buf += ":f01MATCHID<char[256]>,";
+	sql_buf += ":f01MATCHID<char[33]>,";
 	sql_buf += ":f02MATCHNAME<char[256]>,";
-	sql_buf += ":f03BI_RINGID<char[16]>,";
+	sql_buf += ":f03BI_RINGID<char[17]>,";
 	sql_buf += ":f04SEX<short>,";
 	sql_buf += ":f05COLOR<short>,";
 	sql_buf += ":f06SANDEYE<short>,";
-	sql_buf += ":f07IRINGID<char[16]>,";
-	sql_buf += ":f08IRING_RFID<char[16]>,";
-	sql_buf += ":f09IRING_IMEI<char[16]>,";
-	sql_buf += ":f10IRING_BLEMAC<char[16]>,";
-	sql_buf += ":f11IRING_MOBILE<char[16]>,";
+	sql_buf += ":f07IRINGID<char[17]>,";
+	sql_buf += ":f08IRING_RFID<char[17]>,";
+	sql_buf += ":f09IRING_IMEI<char[17]>,";
+	sql_buf += ":f10IRING_BLEMAC<char[17]>,";
+	sql_buf += ":f11IRING_MOBILE<char[17]>,";
 	sql_buf += ":f12RECV_TIME<timestamp>,";
 	sql_buf += ":f13RECORD_TIME<timestamp>,";
 	sql_buf += ":f14LOC_TYPE<short>,";
@@ -550,8 +688,8 @@ void TCPigeonLocationPigeonHandler::OutputRpBrDevStatusMgr(PigeonPkg & pkg)
 	sql_buf += ")";
 	sql_buf += "VALUES(";
 	sql_buf += ":f1DEV_TYPE<int>,";
-	sql_buf += ":f2DEV_ID<char[16]>,";
-	sql_buf += ":f3DEV_IMEI<char[16]>,";
+	sql_buf += ":f2DEV_ID<char[17]>,";
+	sql_buf += ":f3DEV_IMEI<char[17]>,";
 	sql_buf += ":f4DEV_LONGITUDE<double>,";
 	sql_buf += ":f5DEV_LATITUDE<double>,";
 	sql_buf += ":f6DEV_HIGH<int>,";
@@ -626,7 +764,7 @@ void TCPigeonLocationPigeonHandler::RecvRequest(TCCustomUniSocket  &cusSocket) {
 		//: 开始按照 select 来进行判断
 		if (!cusSocket.WaitForData(nTimeOut)) {
 			//: 超时120秒了，可以直接关闭连接；
-			TCString sLog = "Pad Tracker[" + m_sTacker_Send_IPAddress + "]已经超时120秒未发送数据，断开连接";
+			TCString sLog = "PigeonHandle Tracker[" + m_sTacker_Send_IPAddress + "]已经超时120秒未发送数据，断开连接";
 			printf("%s\n", (char*)sLog);
 			glgMls->AddPigeonLocationRunLog(sLog);
 			throw TCException(sLog);
@@ -636,7 +774,7 @@ void TCPigeonLocationPigeonHandler::RecvRequest(TCCustomUniSocket  &cusSocket) {
 		nGetPkgLen = cusSocket.ReceiveBuf(sbuff, nMaxPkg_Length);
 		m_sRecvTime = TCTime::Now();
 		if (nGetPkgLen == 0) {
-			TCString sLog = "Pad Tracker[" + m_sTacker_Send_IPAddress + "]已经断开连接";
+			TCString sLog = "PigeonHandle Tracker[" + m_sTacker_Send_IPAddress + "]已经断开连接";
 			printf("%s\n", (char*)sLog);
 			glgMls->AddPigeonLocationRunLog(sLog);
 			throw TCException(sLog);
