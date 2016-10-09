@@ -72,19 +72,26 @@ bool TCPigeonLocationHomingPosHandler::Main_Handler(TCCustomUniSocket  &cusSocke
 		m_nTimeOut=60;
 		distance_threshold = gPigeonLocationConfig->GetDistanceThresholdValue() / 1000.0;
 		delay_seconds = "60";
+#ifdef __TEST__
+		LOG_WRITE("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n", (char*)cusSocket.GetRemoteAddress(),
+			cusSocket.GetRemotePort(), m_nTimeOut);
+#endif // __TEST__
+
 		
-		printf("接收到 Tracker 数据请求：IP=[%s], Port=[%d], Timeout=[%d]\n", (char*)cusSocket.GetRemoteAddress(), cusSocket.GetRemotePort(), m_nTimeOut);
 		//
 		LoadRpBrGatherSubProc();
 		LoadRpBzNestPad();
 		//: 长连接方式
 		while(1){ 
 			Init();
-			TCString sLogMsg="Time:Now=["+TCTime::Now()+"],Recv Port=["+IntToStr(cusSocket.GetRemotePort())+"] Data";
-            glgMls->AddPigeonLocationRunLog(sLogMsg);
+
+#ifndef __TEST__
+			TCString sLogMsg = "Time:Now=[" + TCTime::Now() + "],Recv Port=[" + IntToStr(cusSocket.GetRemotePort()) + "] Data";
+			glgMls->AddPigeonLocationRunLog(sLogMsg);
+#endif // !__TEST__
+
  			RecvRequest(cusSocket);
 			threshold_flag = 0;
-
  			DealRequest(cusSocket);	
  		}
  		cusSocket.Close();
@@ -114,7 +121,7 @@ void TCPigeonLocationHomingPosHandler::DealRequest(TCCustomUniSocket  &cusSocket
 		//: 按照命令字进行处理；
 #ifdef __TEST__
    	printf("============receive Tracker request==============\n");
-   	printf("Command:=%s, Content=[%s], Time=[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
+   	LOG_WRITE("Command[%s], Content[%s], Time[%s]\n", (char*)m_sReq_Command, (char*)m_sPkg_Content, (char*)TCTime::Now());
 #endif
 
 		//======执行服务调用==========================
@@ -262,6 +269,10 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrDevStatusMgr(HomingPosPkg & pkg
 	if (nest_pad_iter != bz_nest_pad_infos.end()) {
 		nestpad_id = nest_pad_iter->second.nestpad_id_;
 	}
+	else
+	{
+		LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应IMEI[%s]信息\n", (char *)TCTime::Now(), (char *)pkg.pkg_imei);
+	}
 	//
 	std::string tb_name = "RP_BR_DEVSTATUS_MGR";
 
@@ -360,6 +371,11 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 			if (iter_sub != br_gather_subproc_infos.end()) {
 				brgathersubprocinfowithchk.info = iter_sub->second;
 				vec_brgathersubprocinfowithchk.push_back(brgathersubprocinfowithchk);
+			}
+			else
+			{
+				LOG_WRITE("[%s]表RP_BR_GATHER_SUBPROC找不到对应rfid[%s]信息\n",
+					(char *)TCTime::Now(), (char *)brgathersubprocinfowithchk.rfid.c_str());
 			}
 		}
 	}	else if (msg_id == 15) {
@@ -1487,10 +1503,14 @@ void TCPigeonLocationHomingPosHandler::RecvRequest(TCCustomUniSocket  &cusSocket
 		
 		//: 开始按照 select 来进行判断
 		if(!cusSocket.WaitForData(nTimeOut)){
-			//: 超时120秒了，可以直接关闭连接；
-			TCString sLog="Vehicle Tracker[" + m_sTacker_Send_IPAddress + "]已经超时120秒未发送数据，断开连接";
-			printf("%s\n", (char*)sLog);
-			glgMls->AddPigeonLocationRunLog(sLog);
+			//: 超时120秒了，可以直接关闭连接
+			TCString sLog = "Vehicle Tracker[" + m_sTacker_Send_IPAddress + "]已经超时120秒未发送数据，断开连接";
+#ifdef __TEST__			
+			LOG_WRITE("%s\n", (char*)sLog);
+#endif // __TEST__
+
+
+			//glgMls->AddPigeonLocationRunLog(sLog);
 			throw TCException(sLog);
 		}
 		
@@ -1500,8 +1520,8 @@ void TCPigeonLocationHomingPosHandler::RecvRequest(TCCustomUniSocket  &cusSocket
 
 		if(nGetPkgLen==0){
 			TCString sLog="Vehicle Tracker[" + m_sTacker_Send_IPAddress + "]已经断开连接";
-			printf("%s\n", (char*)sLog);
-			glgMls->AddPigeonLocationRunLog(sLog);
+			LOG_WRITE("%s\n", (char*)sLog);
+			//glgMls->AddPigeonLocationRunLog(sLog);
 			throw TCException(sLog);
 		}
 			
@@ -1512,8 +1532,8 @@ void TCPigeonLocationHomingPosHandler::RecvRequest(TCCustomUniSocket  &cusSocket
     	TCString sLogMsg;
 			sLogMsg = "";
 			sLogMsg += TCString("ERROR: 请求报文长度异常=[")+IntToStr(Length(sPkg_Content))+"]" ;
-	  	glgMls->AddPigeonLocationRunLog(sLogMsg);
-    	printf("Error Packet Format: %s\n", (char*)sLogMsg);
+	  	//glgMls->AddPigeonLocationRunLog(sLogMsg);
+    	LOG_WRITE("Error Packet Format: %s\n", (char*)sLogMsg);
     	cusSocket.Close();
 			throw TCException(sLogMsg);
     }
@@ -1542,12 +1562,12 @@ void TCPigeonLocationHomingPosHandler::RecvRequest(TCCustomUniSocket  &cusSocket
     }
     
     //======== 5. 记录日志 =============
-    TCString sLogMsg;
-		sLogMsg = "";
-		sLogMsg += TCString("请求命令码:(") + m_sReq_Command, +"), 记录数=("+IntToStr(m_vsPkgList.size());
-		sLogMsg += TCString(") 内容：（ ") + m_sPkg_Content;
-		sLogMsg += TCString(") 请求包结束\n");
-    glgMls->AddPigeonLocationRunLog(sLogMsg);
+  //  TCString sLogMsg;
+		//sLogMsg = "";
+		//sLogMsg += TCString("请求命令码:(") + m_sReq_Command, +"), 记录数=("+IntToStr(m_vsPkgList.size());
+		//sLogMsg += TCString(") 内容：（ ") + m_sPkg_Content;
+		//sLogMsg += TCString(") 请求包结束\n");
+  //  glgMls->AddPigeonLocationRunLog(sLogMsg);
   }catch (TCException &e){
     cusSocket.Close();
     throw e;
@@ -1578,7 +1598,7 @@ void TCPigeonLocationHomingPosHandler::SendRespPkg(TCCustomUniSocket  &cusSocket
 	m_sSendTime=TCTime::Now();
 
 #ifdef __TEST__		
-	printf("RecvTime=[%s], SendTime=[%s], sTmpRespContent=[%s]\n", (char*)m_sRecvTime, (char*)m_sSendTime, (char*)sTmpRespContent);
+	LOG_WRITE("RecvTime=[%s], SendTime=[%s], SendContent=[%s]\n", (char*)m_sRecvTime, (char*)m_sSendTime, (char*)sTmpRespContent);
 #endif
 
 }
@@ -1607,8 +1627,9 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			sLogMsg = "";
 			sLogMsg += TCString("请求命令码:(") + m_sReq_Command;
 			sLogMsg += TCString(") 报文异常，域数量=[") + IntToStr(lsTrackerPkgList.GetCount())+"]";
-			glgMls->AddPigeonLocationRunLog(sLogMsg);
-			printf("报文异常TCPigeonLocationHomingPosHandler::DoCommand_PigeonLocInfo: %s\n", (char *)sLogMsg);
+			//glgMls->AddPigeonLocationRunLog(sLogMsg);
+			LOG_WRITE("报文异常TCPigeonLocationHomingPosHandler::DoCommand_PigeonLocInfo: %s\n",
+				(char *)sLogMsg);
 			throw TCException(sLogMsg);
 		}
 		//报文解析
@@ -1658,7 +1679,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 				// 
 				TCString sLogMsg;
 				sLogMsg = "";
-				sLogMsg += TCString("ERROR: 距离超过阈值.");
+				sLogMsg += TCString("距离超过阈值.");
 				glgMls->AddPigeonLocationRunLog(sLogMsg);
 
 				//SendRespPkg(cusSocket, TCString("13"), resp_content);
@@ -1713,20 +1734,24 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			{
 				rlen = cusSocket.ReceiveBuf(flame_ptr + rlen, len);
 				total += rlen;
-				std::cout << "total recv:" << total << " current recv:" << rlen << std::endl;
+				//std::cout << "total recv:" << total << " current recv:" << rlen << std::endl;
 			}
-			std::cout << "should recv:" << flame_total_size << " total recv :" << total << std::endl;
+#ifdef __TEST__
+			std::cout << "vedio data should recv:" << flame_total_size << " total recv :" << total << std::endl;
+#endif // __TEST__
+
+			
 			// 接收结束字符",TA"
 			char ch[3] = {0};
 	
 			rlen = cusSocket.ReceiveBuf(ch, sizeof(ch));
 			if (ch[1] != 'T' && ch[1] != 'A') {
-				std::cout << "视频报文传输异常" << std::endl;
+				LOG_WRITE("[%s]视频报文传输异常\n", (char *)TCTime::Now());
 			}
 			if (!Back2NestVideoRespHandle(cusSocket, pkg)) {
 				TCString sLogMsg;
 				sLogMsg = "";
-				sLogMsg += TCString("ERROR: 距离超过阈值.");
+				sLogMsg += TCString("距离超过阈值.");
 				glgMls->AddPigeonLocationRunLog(sLogMsg);
 
 				//SendRespPkg(cusSocket, TCString("17"), resp_content);
@@ -1758,7 +1783,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			if (!RacingPigeonsDataRespPosHandle(cusSocket, pkg)) {
 				TCString sLogMsg;
 				sLogMsg = "";
-				sLogMsg += TCString("ERROR: 距离超过阈值.");
+				sLogMsg += TCString("距离超过阈值.");
 				glgMls->AddPigeonLocationRunLog(sLogMsg);
 
 				//SendRespPkg(cusSocket, TCString("19"), resp_content);
