@@ -349,18 +349,25 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	std::vector<BRGatherSubprocInfoWithChk> vec_brgathersubprocinfowithchk;
 	vec_brgathersubprocinfowithchk.clear();
 	BRGatherSubprocInfoWithChk brgathersubprocinfowithchk;
-	const short interval_tmp = 6;
+	const short interval_tmp = 7;
 	if (msg_id == 13) {
 		for (int idx = 0; idx < rfid_num; idx++) {
 			brgathersubprocinfowithchk.Clear();
-			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
-				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[10 + interval_tmp * idx]);
-			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
+			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[11 + interval_tmp * idx].IsEmpty()
+				? lsTrackerPkgList[10 + interval_tmp * idx] : lsTrackerPkgList[11 + interval_tmp * idx]);
+			if (brgathersubprocinfowithchk.homing_time.empty()) {
+				brgathersubprocinfowithchk.homing_time = (char *)TCTime::RelativeTime(TCTime::Now(), -8 * 3600);
+			}
+			brgathersubprocinfowithchk.homing_time = TCTime::RelativeTime((char *)brgathersubprocinfowithchk.homing_time.c_str(),
+				StrToInt(lsTrackerPkgList[12 + interval_tmp * idx]));
+
+			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[11 + interval_tmp * idx].IsEmpty()
 				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[11 + interval_tmp * idx]);
-			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[12 + interval_tmp * idx];
-			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[13 + interval_tmp * idx];
-			brgathersubprocinfowithchk.rfid_chk_1 = lsTrackerPkgList[14 + interval_tmp * idx];
-			brgathersubprocinfowithchk.rfid_chk_2 = lsTrackerPkgList[15 + interval_tmp * idx];
+
+			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[13 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[14 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_1 = lsTrackerPkgList[15 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_2 = lsTrackerPkgList[16 + interval_tmp * idx];
 			std::map<std::string, BRGatherSubprocInfo>::iterator iter_sub = br_gather_subproc_infos.find(brgathersubprocinfowithchk.rfid);
 			// 如果找不到则需要重新加载
 			if (iter_sub == br_gather_subproc_infos.end()) {
@@ -381,14 +388,21 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	}	else if (msg_id == 15) {
 		for (int idx = 0; idx < rfid_num; idx++) {
 			brgathersubprocinfowithchk.Clear();
-			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
-				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[10 + interval_tmp * idx]);
+			brgathersubprocinfowithchk.homing_time = (char *)(lsTrackerPkgList[11 + interval_tmp * idx].IsEmpty()
+				? lsTrackerPkgList[10 + interval_tmp * idx] : lsTrackerPkgList[11 + interval_tmp * idx]);
+			if (brgathersubprocinfowithchk.homing_time.empty()) {
+				brgathersubprocinfowithchk.homing_time = (char *)TCTime::RelativeTime(TCTime::Now(), -8 * 3600);
+			}
+			brgathersubprocinfowithchk.homing_time = TCTime::RelativeTime((char *)brgathersubprocinfowithchk.homing_time.c_str(),
+				StrToInt(lsTrackerPkgList[12 + interval_tmp * idx]));
+
 			brgathersubprocinfowithchk.gps_time = (char *)(lsTrackerPkgList[10 + interval_tmp * idx].IsEmpty()
 				? TCTime::RelativeTime(TCTime::Now(), -8 * 3600) : lsTrackerPkgList[11 + interval_tmp * idx]);
-			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[15 + interval_tmp * idx];
-			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[12 + interval_tmp * idx];
-			brgathersubprocinfowithchk.rfid_chk_1[13 + interval_tmp * idx];
-			brgathersubprocinfowithchk.rfid_chk_2[14 + interval_tmp * idx];
+
+			brgathersubprocinfowithchk.mode_st = (char *)lsTrackerPkgList[16 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid = (char *)lsTrackerPkgList[13 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_1[14 + interval_tmp * idx];
+			brgathersubprocinfowithchk.rfid_chk_2[15 + interval_tmp * idx];
 
 			std::map<std::string, BRGatherSubprocInfo>::iterator iter_sub = br_gather_subproc_infos.find(brgathersubprocinfowithchk.rfid);
 			//
@@ -1673,7 +1687,8 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			}
 			TCString resp_content = lsTrackerPkgList[9] + ",";
 			int rfid_num = StrToInt(lsTrackerPkgList[9]);
-			TCString ble_num = lsTrackerPkgList[9 + rfid_num * 6 + 1];
+			// *6->*7
+			TCString ble_num = lsTrackerPkgList[9 + rfid_num * 7 + 1];
 			resp_content += ble_num;
 			if (!Back2NestRespHandle(cusSocket, pkg)) {
 				// 
