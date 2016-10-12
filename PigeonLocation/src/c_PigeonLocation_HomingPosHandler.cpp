@@ -16,6 +16,7 @@ Create Date : 2016-05-04
 #include <iostream>
 #include <ctime>
 #include <fstream>
+#include <sstream>
 
 
 #pragma package(smart_init)
@@ -221,6 +222,7 @@ void TCPigeonLocationHomingPosHandler::LoadRpBzNestPad()
 	NESTPAD_ID， NESTPAD_IMEI, NESTPAD_BLEMAC， 归巢地点GPS (NESTPAD_LONGITUDE, NESTPAD_LATITUDE),
 	在内存中保留位 NESTPAD_IMEI为主键的数组，并定期更新（定时更新和未查询到记录时更新）
 	*/
+	bz_nest_pad_infos.clear();
 	std::string tb_name = "RP_BZ_NESTPAD";
 	std::string sql_buf = "SELECT OWNERID,OWNERNAME,OWNERNAME_CHN, DORM_ID, DORM_NAME,";
 	sql_buf += "DORM_ADDRESS,DORM_LONGITUDE,DORM_LATITUDE, NESTPAD_ID, NESTPAD_IMEI,";
@@ -451,9 +453,16 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 						vec_brgathersubprocinfowithchk.push_back(brgathersubprocinfowithchk);
 					}
 				}	else {
-					//表中没有该rfid对应的记录
+					//TODO: 表中没有该rfid对应的记录
 					vec_brgathersubprocinfowithchk.push_back(brgathersubprocinfowithchk);
 				}
+			}
+			else
+			{
+				//TODO: RP_BR_GATHER_SUBPROC 无对应的rfid
+				LOG_WRITE("[%s]表RP_BZ_RP_BR_GATHER_SUBPROCNESTPAD无对应rfid[%s]信息",
+					(char *)TCTime::Now(), brgathersubprocinfowithchk.rfid.c_str());
+				;
 			}
 			otl_s.flush();
 			otl_s.close();
@@ -470,6 +479,10 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 	}	
 	if (iter_pad != bz_nest_pad_infos.end()) {
 		pad_info = iter_pad->second;
+	} else {
+		//TODO:RP_BZ_NESTPAD无对应的imei
+		LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应IMEI[%s]信息", (char *)TCTime::Now(), (char *)pkg.pkg_imei);
+		;
 	}
 	// 入表
 	tb_name.clear();
@@ -647,7 +660,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 			{
 				LOG_WRITE("RP_BZ_MATCH未找到对应的matchid.");
 				otl_s.close();
-				return;
+				continue;
 			}
 			otl_s.close();
 
@@ -666,9 +679,14 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestPadSubproc(const TCString &
 			// 获得距离km
 			double distance_d = get_distance(StrToFloat(pkg.pkg_latitude), StrToFloat(pkg.pkg_longitude), matchstart_latitude, matchstart_longitude);
 			// 计算速度
-			double speed = distance_d * 1000 / (interval_seconds / 60);
-			std::cout << "start time:" << (char *)matchstart_time_tc << "end time: time_tmp"
+			double speed = distance_d * 1000 * 60 / interval_seconds;
+
+#ifdef __TEST__
+		
+			std::cout << "start time: " << (char *)matchstart_time_tc << "end time: "
 				<< (char *)time_tmp << "seconds:" << interval_seconds << std::endl;
+#endif // __TEST__
+
 			sql_buf = "INSERT INTO RP_BR_MATCH_RESULT";
 			sql_buf += "(";
 			sql_buf += "MATCHID,";
@@ -1224,8 +1242,23 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 			otl_s >> pigeons_homing_info.iring_blemac_;
 			otl_s >> pigeons_homing_info.iring_mobile_;
 			otl_s >> pigeons_homing_info.iring_imsi_;
-			racing_pigeons_data_homing_infos.push_back(pigeons_homing_info);
+			if (pigeons_homing_info.type_ != 1) {
+				pigeons_homing_info.type_ = 1;
+				LOG_WRITE("[%s]报文鸽环类型与RP_BZ_IRING中得鸽环类型不一致以RP_BZ_IRING为准",
+					pigeons_homing_info.rfid_.c_str());
+			}
 		}
+		else
+		{
+			LOG_WRITE("[%s]表RP_BZ_IRING无对应rfid[%s]信息,该环为普通环\n", (char *)TCTime::Now(),
+				(char *)pigeons_homing_info.rfid_.c_str());
+			if (pigeons_homing_info.type_ != 0) {
+				pigeons_homing_info.type_ = 0;
+				LOG_WRITE("[%s]报文鸽环类型与RP_BZ_IRING中得鸽环类型不一致以RP_BZ_IRING为准",
+					pigeons_homing_info.rfid_.c_str());
+			}			
+		}
+		racing_pigeons_data_homing_infos.push_back(pigeons_homing_info);
 		otl_s.flush();
 		otl_s.close();
 		// TODO:RP_BZ_IRING查询结果为空
@@ -1238,6 +1271,10 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 	}
 	if (iter_pad != bz_nest_pad_infos.end()) {
 		pad_info = iter_pad->second;
+	}
+	else
+	{
+		LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应的IMEI[%s]\n", (char *)TCTime::Now(), (char *)pkg.pkg_imei);
 	}
 	//入表
 	tb_name = "RP_BZ_RACINGPIGEON";
@@ -1279,7 +1316,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 	sql_buf += "FIT_DEV_LATITUDE,";
 	sql_buf += "FIT_DEV_HIGH,";
 	sql_buf += "VALID_FLAG,";
-	sql_buf += "THRESHOLD_FLAG";
+	sql_buf += "THRESHOLD_FLAG,";
+	sql_buf += "RING_TYPE";
 	sql_buf += ")";
 	sql_buf += "VALUES";
 	sql_buf += "(";
@@ -1318,7 +1356,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 	sql_buf += ":f33FIT_DEV_LATITUDE<double>,";
 	sql_buf += ":f34FIT_DEV_HIGH<int>,";
 	sql_buf += ":f35VALID_FLAG<short>,";
-	sql_buf += ":f36THRESHOLD_FLAG<short>";	
+	sql_buf += ":f36THRESHOLD_FLAG<short>,";
+	sql_buf += ":f37RING_TYPE<short>";
 	sql_buf += ")";
 	// 入表
 	otl_s.open(10, sql_buf.c_str(), m_dbConnect);
@@ -1372,6 +1411,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 		short valid_flag = 1;
 		otl_s << valid_flag;
 		otl_s << threshold_flag;
+		otl_s << racing_pigeons_data_homing_infos[i].type_;
 	}
 	otl_s.flush();
 	otl_s.close();
@@ -1703,7 +1743,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			};
 			SendRespPkg(cusSocket, TCString("13"), resp_content);
 			//
-			// 入库 RP_BR_NESTPAD_SUBPROC 处理
+			// 入库 RP_BR_NESTPAD_SUBPROC / RP_BR_MATCH_RESULT处理 
 			OutputRpBrNestPadSubproc(m_sPkg_Content, pkg, 13);
 			// Back2NestIndicate报文后，在完成对报文的解析，并入库完成 RP_BR_NESTPAD_SUBPROC 
 			//RP_BR_DEVSTATUS_MGR
@@ -1711,7 +1751,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 		}	else if (msg_id == "14") {
 			TCString resp_content = lsTrackerPkgList[9] + ",";
 			int rfid_num = StrToInt(lsTrackerPkgList[9]);
-			TCString ble_num = lsTrackerPkgList[9 + rfid_num * 6 + 1];
+			TCString ble_num = lsTrackerPkgList[9 + rfid_num * 7 + 1];
 			resp_content += ble_num;
 			// 归巢定位器上传存储的服务器未正常接收的RFID及时间数据
 			if (!FlashMemDataRespHandle(cusSocket, pkg)) {
@@ -1760,7 +1800,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			char ch[3] = {0};
 	
 			rlen = cusSocket.ReceiveBuf(ch, sizeof(ch));
-			if (ch[1] != 'T' && ch[1] != 'A') {
+			if (ch[1] != 'T' && ch[2] != 'A') {
 				LOG_WRITE("[%s]视频报文传输异常\n", (char *)TCTime::Now());
 			}
 			if (!Back2NestVideoRespHandle(cusSocket, pkg)) {

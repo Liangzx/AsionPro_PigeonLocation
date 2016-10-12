@@ -1246,8 +1246,7 @@ void TCPigeonLocationHomingPosHandler::OutputRpBzRacingPigeonHomingPos(const TCS
 		}
 		else
 		{
-			LOG_WRITE("[%s]表RP_BZ_IRING无对应rfid[%s]信息\n", (char *)TCTime::Now(),
-				(char *)pigeons_homing_info.rfid_.c_str());
+			LOG_WRITE("[%s]表RP_BZ_IRING无对应rfid[%s]信息\n");
 		}
 		otl_s.flush();
 		otl_s.close();

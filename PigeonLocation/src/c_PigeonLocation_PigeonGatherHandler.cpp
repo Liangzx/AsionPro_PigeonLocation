@@ -228,7 +228,7 @@ void TCPigeonLocationPigeonGatherHandler::GetRacingPigeonInfosByRfid(RacingPigeo
 	otl_stream otl_s;
 	sql_buf.clear();
 	sql_buf = "SELECT OWNERID,OWNERNAME,OWNERNAME_CHN,BI_RINGID,SEX,COLOR,";
-	sql_buf += "SANDEYE,IRINGID, IRING_IMEI, IRING_BLEMAC, IRING_MOBILE FROM ";
+	sql_buf += "SANDEYE,IRINGID, IRING_IMEI, IRING_BLEMAC, IRING_MOBILE, RING_TYPE FROM ";
 	sql_buf += tb_name;
 	sql_buf += " WHERE IRING_RFID='";
 	sql_buf += racing_pegeons.rfid;
@@ -247,6 +247,7 @@ void TCPigeonLocationPigeonGatherHandler::GetRacingPigeonInfosByRfid(RacingPigeo
 			otl_s >> racing_pegeons.iring_imei;
 			otl_s >> racing_pegeons.iring_blemac;
 			otl_s >> racing_pegeons.iring_mobile;
+			otl_s >> racing_pegeons.ring_type;
 		} else {
 			// 不入表
 			racing_pegeons.rfid = "-1";
@@ -263,29 +264,32 @@ void TCPigeonLocationPigeonGatherHandler::GetRpBzGatherNestPadInfo(std::string o
 	std::vector<RpBzGatherNestPadInfo>& gather_nest_pad_infos)
 {
 	__ENTERFUNCTION;
-	std::string sql_buf = "SELECT DORM_ID,DORM_NAME,DORM_ADDRESS,NESTPAD_ID,NESTPAD_INDEX,NESTPAD_IMEI ";
-	sql_buf += " FROM RP_BZ_NESTPAD A WHERE A.OWNERID='";
-	sql_buf += owner_id;
-	sql_buf += "'";
+	if (!owner_id.empty()) {
+		std::string sql_buf = "SELECT DORM_ID,DORM_NAME,DORM_ADDRESS,NESTPAD_ID,NESTPAD_INDEX,NESTPAD_IMEI ";
+		sql_buf += " FROM RP_BZ_NESTPAD A WHERE A.OWNERID='";
+		sql_buf += owner_id;
+		sql_buf += "'";
 
-	otl_stream otl_s;
-	long nest_index = 0;
-	otl_s.open(10, sql_buf.c_str(), m_dbConnect);
-	RpBzGatherNestPadInfo gather_pad_info;
-	while (!otl_s.eof())	{
-		gather_pad_info.Clear();
-		gather_pad_info.owner_id_ = owner_id;
-		otl_s >> gather_pad_info.dorm_id_;
-		otl_s >> gather_pad_info.dorm_name_;
-		otl_s >> gather_pad_info.dorm_address_;
-		otl_s >> gather_pad_info.nestpad_id_;
-		otl_s >> nest_index;
-		gather_pad_info.nestpad_index_ = (char *)IntToStr(nest_index);
-		otl_s >> gather_pad_info.nestpad_imei_;
-		gather_nest_pad_infos.push_back(gather_pad_info);
+		otl_stream otl_s;
+		long nest_index = 0;
+		otl_s.open(10, sql_buf.c_str(), m_dbConnect);
+		RpBzGatherNestPadInfo gather_pad_info;
+		while (!otl_s.eof()) {
+			gather_pad_info.Clear();
+			gather_pad_info.owner_id_ = owner_id;
+			otl_s >> gather_pad_info.dorm_id_;
+			otl_s >> gather_pad_info.dorm_name_;
+			otl_s >> gather_pad_info.dorm_address_;
+			otl_s >> gather_pad_info.nestpad_id_;
+			otl_s >> nest_index;
+			gather_pad_info.nestpad_index_ = (char *)IntToStr(nest_index);
+			otl_s >> gather_pad_info.nestpad_imei_;
+			gather_nest_pad_infos.push_back(gather_pad_info);
+		}
+		otl_s.flush();
+		otl_s.close();
 	}
-	otl_s.flush();
-	otl_s.close();
+	
 	__LEAVEFUNCTION;
 }
 
@@ -337,6 +341,10 @@ bool TCPigeonLocationPigeonGatherHandler::GetRFIDStatusRespInfo(std::vector<RFID
 		if (!otl_s.eof()) {
 			rfidstatusrespinfo[i].rfid_type_ = "1";
 		}
+		else
+		{
+			rfidstatusrespinfo[i].rfid_type_ = "0";
+		}
 		otl_s.flush();
 		otl_s.close();
 	}
@@ -372,7 +380,7 @@ void TCPigeonLocationPigeonGatherHandler::GetRacingPigeonsDataRespInfo(std::vect
 		}
 		else
 		{
-			LOG_WRITE("RP_BZ_IRING无对应的rfid[%s]", racingpigeonsdatarespinfos[i].rfid.c_str());
+			LOG_WRITE("RP_BZ_IRING无对应的rfid[%s]普通环", racingpigeonsdatarespinfos[i].rfid.c_str());
 		}
 		otl_s.flush();
 		otl_s.close();
@@ -747,7 +755,7 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				//otl_s.flush();
 				//otl_s.close();
 			}
-			TCString owner_id;
+			TCString owner_id = "";
 			// 根据rfid保存需要查询的赛鸽信息
 			if (!GetRFIDStatusRespInfo(rfid_status_resp_infos)) {
 				// TODO:如果上述的结果全部为空，那么需要从内存中查询该手机号码对应的机主鸽舍和用户ID信息
@@ -756,16 +764,21 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				获取到 OWNERID、OWNERNAME、OWNERNAME_CHN
 				*/
 				LOG_WRITE("[%s]根据鸽主手机号获取鸽舍相关信息", (char *)TCTime::Now());
+				std::string owner_mobile = (char *)lsTrackerPkgList[9];
 				std::map<std::string, PigeonOwnerInfo>::iterator iter_pigeon_owner =
-					pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
+					pigeon_owner_infos.find(owner_mobile);
 				if (iter_pigeon_owner == pigeon_owner_infos.end()) {
 					LoadRpBzPigeonOwner();
-					iter_pigeon_owner = pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
+					iter_pigeon_owner = pigeon_owner_infos.find(owner_mobile);
 				}
 				
 				if (iter_pigeon_owner != pigeon_owner_infos.end()) {
 						owner_id = (char *)iter_pigeon_owner->second.owner_id_.c_str();
-					}
+				}
+				else
+				{
+					LOG_WRITE("鸽主手机号[%s]在表RP_BZ_PIGEON_OWNER无对应信息\n", owner_mobile.c_str());
+				}
 			} else {
 				owner_id = (char *)rfid_status_resp_infos[0].ownerid_.c_str();
 			}
@@ -778,7 +791,9 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 
 			GetRpBzGatherNestPadInfo((char *)owner_id,nest_pad_infos);
 			if (nest_pad_infos.empty()) {
-				LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应的[%s]信息", (char *)TCTime::Now(), (char *)owner_id);
+				LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应的鸽主id[%s]信息,留空处理",
+					(char *)TCTime::Now(), (char *)owner_id);
+				nest_pad_infos.push_back(RpBzGatherNestPadInfo());
 			}
 			// 拼接报文			
 			std::string res_buf = JointPkgFields(nest_pad_infos, rfid_status_resp_infos);
@@ -849,7 +864,11 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 					threshold_flag = 1;
 					//throw TCException(sLogMsg);
 				}
-			}			
+			}
+			else
+			{
+
+			}
 			// 根据报文获取补录信鸽的信息
 			TCString add_record_num = lsTrackerPkgList[10];
 			std::vector<RacingPigeonsDataRespInfo> racing_pigeons_data_resp_info;
@@ -870,12 +889,14 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 					sql_buf += "'";
 					otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
 					if (!otl_s.eof()) {
-						racing_pigeons_data_resp_info.push_back(res_info);
+						res_info.ring_type = 1;						
 					}
 					else
 					{
-						LOG_WRITE("RP_BZ_IRING 无对应的rfid[%s]", res_info.rfid.c_str());
+						LOG_WRITE("RP_BZ_IRING 无对应的rfid[%s]该环为普通环\n", res_info.rfid.c_str());
+						res_info.ring_type = 0;
 					}
+					racing_pigeons_data_resp_info.push_back(res_info);
 					otl_s.flush();
 					otl_s.close();
 				}	catch (const otl_exception & e) {
@@ -1023,7 +1044,8 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 	sql_buf += "GATHER_TIME,";
 	sql_buf += "GATHER_RFID_2STCRC,";
 	sql_buf += "VALID_FLAG,";
-	sql_buf += "THRESHOLD_FLAG";
+	sql_buf += "THRESHOLD_FLAG,";
+	sql_buf += "RING_TYPE";
 	sql_buf += ")";
 	sql_buf += "VALUES(";
 	sql_buf += ":f1MATCHID<char[33]>,";
@@ -1049,7 +1071,8 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 	sql_buf += ":f21GATHER_TIME<timestamp>,";
 	sql_buf += ":f22GATHER_RFID_2STCRC<char[17]>,";
 	sql_buf += ":f23VALID_FLAG<short>,";
-	sql_buf += ":f24THRESHOLD_FLAG<short>";
+	sql_buf += ":f24THRESHOLD_FLAG<short>,";
+	sql_buf += ":f25RING_TYPE<short>";
 	sql_buf += ")";
 
 	otl_stream otl_s(100, sql_buf.c_str(), m_dbConnect);
@@ -1091,6 +1114,7 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBrGatherSubProc(const GatherDe
 		
 		otl_s << valid_flag;
 		otl_s << threshold_flag;
+		otl_s << racing_pegeons[i].ring_type;
 	}
 	__LEAVEFUNCTION;
 }
@@ -1129,7 +1153,8 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBzRacingPigeon(const PigeonGat
 	sql_buf += "FIT_DEV_LATITUDE,";
 	sql_buf += "FIT_DEV_HIGH,";
 	sql_buf += "VALID_FLAG,";
-	sql_buf += "THRESHOLD_FLAG";
+	sql_buf += "THRESHOLD_FLAG,";
+	sql_buf += "RING_TYPE";
 	sql_buf += ")";
 	sql_buf += "VALUES(";
 	sql_buf += ":f01OWNERID<char[17]>,";
@@ -1156,7 +1181,8 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBzRacingPigeon(const PigeonGat
 	sql_buf += ":f22FIT_DEV_LATITUDE<double>,";
 	sql_buf += ":f23FIT_DEV_HIGH<int>,";
 	sql_buf += ":f24VALID_FLAG<short>,";
-	sql_buf += ":f25THRESHOLD_FLAG<short>";
+	sql_buf += ":f25THRESHOLD_FLAG<short>,";
+	sql_buf += ":f26RING_TYPE<short>";
 	sql_buf += ")";
 
 	otl_stream otl_s(10, sql_buf.c_str(), m_dbConnect);
@@ -1197,6 +1223,7 @@ void TCPigeonLocationPigeonGatherHandler::OutputRpBzRacingPigeon(const PigeonGat
 		otl_s << (int)StrToInt(pkg.pkg_altitude);
 		otl_s << valid_flag;
 		otl_s << threshold_flag;
+		otl_s << racing_pigeons_data_resp_info[i].ring_type;
 	}
 	otl_s.flush();
 	otl_s.close();

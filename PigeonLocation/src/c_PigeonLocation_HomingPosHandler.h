@@ -92,7 +92,7 @@ typedef struct RacingPigeonsDataHomingInfo {
 	short sex_;
 	short color_;
 	short sandeye_;
-	short type_;
+	short type_;//鸽环的类型
 	std::string rfid_;
 	std::string rfid_chk_1_;
 	std::string bi_ringid_;

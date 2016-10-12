@@ -88,6 +88,7 @@ typedef struct RacingPigeon{
 	short sex;
 	short color;
 	short sandeye;
+	short ring_type;
 	std::string iringid;
 	std::string iring_imei;
 	std::string iring_blemac;
@@ -139,6 +140,7 @@ typedef struct RacingPigeonsDataRespInfo {
 	short sex;
 	short color;
 	short sandeye;
+	short ring_type;	// 对应的环的类型 0普通 / 1智能
 	std::string rfid;
 	std::string rfid_chk;
 	std::string iringid;
@@ -160,6 +162,7 @@ typedef struct RacingPigeonsDataRespInfo {
 		sex = -1;
 		color = -1;
 		sandeye = -1;
+		ring_type = -1;
 	}
 };
 

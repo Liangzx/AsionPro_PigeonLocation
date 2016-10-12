@@ -1,0 +1,1 @@
+alter table MB_BSS_TERMINAL_LOCATION add partition PART_YYYYMMDD values less than (TIMESTAMP'YYYY-MM-DD 00:00:00.000000') tablespace  $DB_TABLE_SPACE compress
