@@ -867,7 +867,8 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			}
 			else
 			{
-
+				//TODO:RP_BZ_GATHER_DEV无对应的IMEI
+				LOG_WRITE("表RP_BZ_GATHER_DEV[%s]无对应的IMEI.\n", (char *)pkg.pkg_gather_imei);
 			}
 			// 根据报文获取补录信鸽的信息
 			TCString add_record_num = lsTrackerPkgList[10];

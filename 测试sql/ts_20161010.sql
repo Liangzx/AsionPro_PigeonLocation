@@ -32,7 +32,7 @@ select * from RP_BR_MATCH_RESULT
 select * from RP_BR_NESTPAD_SUBPROC
 delete from RP_BR_MATCH_RESULT
 delete from RP_BR_NESTPAD_SUBPROC
-
+delete from RP_BR_MATCH_RESULT
 select * from rp_bz_match
 
 delete from RP_BR_NESTVIDEO_SUBPROC
@@ -40,7 +40,16 @@ select * from RP_BR_NESTVIDEO_SUBPROC
 select * from RP_BR_PIGEON_NESTVIDEO
 delete from RP_BR_PIGEON_NESTVIDEO
 
+select iring_rfid,ring_type from RP_BZ_RACINGPIGEON order by iring_rfid
+select * from RP_BR_GATHER_SUBPROC
 
+select * from RP_BZ_PIGEON_OWNER
+select * from RP_BZ_NESTPAD
+select * from RP_BZ_IRING
+select * from RP_BR_GATHER_SUBPROC
+select * from RP_BZ_RACINGPIGEON
+delete from RP_BZ_RACINGPIGEON
+delete from RP_BR_GATHER_SUBPROC
 
 
 
