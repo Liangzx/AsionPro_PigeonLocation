@@ -815,7 +815,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 	//视频总帧数N
 	int vedio_flames = StrToInt(lsTrackerPkgList[12 + rfid_num + 2]);
 	//视频帧长度
-	std::string vedio_flames_size = (char *)lsTrackerPkgList[12 + rfid_num + 3];
+	//std::string vedio_flames_size = (char *)lsTrackerPkgList[12 + rfid_num + 3];
+	int flames_db = vedio_size / StrToInt(lsTrackerPkgList[12 + rfid_num + 3]);
 	std::vector<NestVideoInfo> nestvideoinfos;
 	nestvideoinfos.clear();
 	NestVideoInfo vedio_info;
@@ -986,7 +987,8 @@ void TCPigeonLocationHomingPosHandler::OutputRpBrNestVideoSubproc(const TCString
 		}
 		
 		// 视频内容时长
-		otl_s << vedio_seconds;
+		//otl_s << vedio_seconds;
+		otl_s << flames_db;
 		// 视频数据包
 		otl_s << threshold_flag;
 
@@ -1785,12 +1787,44 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			int rlen = 0;
 			// 接收相应长度的视频数据
 			long total = 0;
+			// 阈值判定
+			if (!Back2NestVideoRespHandle(cusSocket, pkg)) {
+				TCString sLogMsg;
+				sLogMsg = "";
+				sLogMsg += TCString("距离超过阈值.");
+				glgMls->AddPigeonLocationRunLog(sLogMsg);
+
+				//SendRespPkg(cusSocket, TCString("17"), resp_content);
+				threshold_flag = 1;
+				//throw TCException(sLogMsg);
+			}//
+
 			for (int len = flame_total_size; len; len = len - rlen)
 			{
 				rlen = cusSocket.ReceiveBuf(flame_ptr + rlen, len);
 				total += rlen;
 				//std::cout << "total recv:" << total << " current recv:" << rlen << std::endl;
+				if (rlen == 0) {
+					// 网络异常--接收异常文件接收不完保留整帧
+					int flames = total / flame_num_size;
+					total = flames * flame_num_size;
+					OutputRpBrNestVideoSubproc(m_sPkg_Content, pkg, flame_ptr, total);
+
+					////视频输出到文件
+					LOG_WRITE("网络异常断开连接,视频数据不完整保留整帧[%d]帧.\n", flames);
+					std::fstream iof("./vedio_check", std::ios::ate | std::ios::out | std::ios::binary);
+					if (iof.fail()) {
+						perror("open ./vedio_check fail:");
+					}
+					iof.write(flame_ptr, total);
+					iof.close();
+					delete[] flame_ptr;
+					OutputRpBrPigeonNestVideo(m_sPkg_Content, pkg);
+					OutputRpBrDevStatusMgr(pkg, 1, 2);
+					return;
+				}
 			}
+			
 #ifdef __TEST__
 			std::cout << "vedio data should recv:" << flame_total_size << " total recv :" << total << std::endl;
 #endif // __TEST__
@@ -1803,16 +1837,7 @@ void TCPigeonLocationHomingPosHandler::DoCommand_LocInfo(TCCustomUniSocket  &cus
 			if (ch[1] != 'T' && ch[2] != 'A') {
 				LOG_WRITE("[%s]视频报文传输异常\n", (char *)TCTime::Now());
 			}
-			if (!Back2NestVideoRespHandle(cusSocket, pkg)) {
-				TCString sLogMsg;
-				sLogMsg = "";
-				sLogMsg += TCString("距离超过阈值.");
-				glgMls->AddPigeonLocationRunLog(sLogMsg);
-
-				//SendRespPkg(cusSocket, TCString("17"), resp_content);
-				threshold_flag = 1;
-				//throw TCException(sLogMsg);
-			}
+			
 			SendRespPkg(cusSocket, TCString("17"), resp_content);
 			OutputRpBrNestVideoSubproc(m_sPkg_Content, pkg, flame_ptr, flame_total_size);
 
