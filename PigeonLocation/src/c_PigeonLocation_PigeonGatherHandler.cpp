@@ -264,32 +264,29 @@ void TCPigeonLocationPigeonGatherHandler::GetRpBzGatherNestPadInfo(std::string o
 	std::vector<RpBzGatherNestPadInfo>& gather_nest_pad_infos)
 {
 	__ENTERFUNCTION;
-	if (!owner_id.empty()) {
-		std::string sql_buf = "SELECT DORM_ID,DORM_NAME,DORM_ADDRESS,NESTPAD_ID,NESTPAD_INDEX,NESTPAD_IMEI ";
-		sql_buf += " FROM RP_BZ_NESTPAD A WHERE A.OWNERID='";
-		sql_buf += owner_id;
-		sql_buf += "'";
+	std::string sql_buf = "SELECT DORM_ID,DORM_NAME,DORM_ADDRESS,NESTPAD_ID,NESTPAD_INDEX,NESTPAD_IMEI ";
+	sql_buf += " FROM RP_BZ_NESTPAD A WHERE A.OWNERID='";
+	sql_buf += owner_id;
+	sql_buf += "'";
 
-		otl_stream otl_s;
-		long nest_index = 0;
-		otl_s.open(10, sql_buf.c_str(), m_dbConnect);
-		RpBzGatherNestPadInfo gather_pad_info;
-		while (!otl_s.eof()) {
-			gather_pad_info.Clear();
-			gather_pad_info.owner_id_ = owner_id;
-			otl_s >> gather_pad_info.dorm_id_;
-			otl_s >> gather_pad_info.dorm_name_;
-			otl_s >> gather_pad_info.dorm_address_;
-			otl_s >> gather_pad_info.nestpad_id_;
-			otl_s >> nest_index;
-			gather_pad_info.nestpad_index_ = (char *)IntToStr(nest_index);
-			otl_s >> gather_pad_info.nestpad_imei_;
-			gather_nest_pad_infos.push_back(gather_pad_info);
-		}
-		otl_s.flush();
-		otl_s.close();
+	otl_stream otl_s;
+	long nest_index = 0;
+	otl_s.open(10, sql_buf.c_str(), m_dbConnect);
+	RpBzGatherNestPadInfo gather_pad_info;
+	while (!otl_s.eof()) {
+		gather_pad_info.Clear();
+		gather_pad_info.owner_id_ = owner_id;
+		otl_s >> gather_pad_info.dorm_id_;
+		otl_s >> gather_pad_info.dorm_name_;
+		otl_s >> gather_pad_info.dorm_address_;
+		otl_s >> gather_pad_info.nestpad_id_;
+		otl_s >> nest_index;
+		gather_pad_info.nestpad_index_ = (char *)IntToStr(nest_index);
+		otl_s >> gather_pad_info.nestpad_imei_;
+		gather_nest_pad_infos.push_back(gather_pad_info);
 	}
-	
+	otl_s.flush();
+	otl_s.close();
 	__LEAVEFUNCTION;
 }
 
@@ -755,7 +752,7 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				//otl_s.flush();
 				//otl_s.close();
 			}
-			TCString owner_id = "";
+			TCString owner_id;
 			// 根据rfid保存需要查询的赛鸽信息
 			if (!GetRFIDStatusRespInfo(rfid_status_resp_infos)) {
 				// TODO:如果上述的结果全部为空，那么需要从内存中查询该手机号码对应的机主鸽舍和用户ID信息
@@ -764,21 +761,16 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 				获取到 OWNERID、OWNERNAME、OWNERNAME_CHN
 				*/
 				LOG_WRITE("[%s]根据鸽主手机号获取鸽舍相关信息", (char *)TCTime::Now());
-				std::string owner_mobile = (char *)lsTrackerPkgList[9];
 				std::map<std::string, PigeonOwnerInfo>::iterator iter_pigeon_owner =
-					pigeon_owner_infos.find(owner_mobile);
+					pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
 				if (iter_pigeon_owner == pigeon_owner_infos.end()) {
 					LoadRpBzPigeonOwner();
-					iter_pigeon_owner = pigeon_owner_infos.find(owner_mobile);
+					iter_pigeon_owner = pigeon_owner_infos.find((char *)lsTrackerPkgList[9]);
 				}
 				
 				if (iter_pigeon_owner != pigeon_owner_infos.end()) {
 						owner_id = (char *)iter_pigeon_owner->second.owner_id_.c_str();
-				}
-				else
-				{
-					LOG_WRITE("鸽主手机号[%s]在表RP_BZ_PIGEON_OWNER无对应信息\n", owner_mobile.c_str());
-				}
+					}
 			} else {
 				owner_id = (char *)rfid_status_resp_infos[0].ownerid_.c_str();
 			}
@@ -791,9 +783,7 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 
 			GetRpBzGatherNestPadInfo((char *)owner_id,nest_pad_infos);
 			if (nest_pad_infos.empty()) {
-				LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应的鸽主id[%s]信息,留空处理",
-					(char *)TCTime::Now(), (char *)owner_id);
-				nest_pad_infos.push_back(RpBzGatherNestPadInfo());
+				LOG_WRITE("[%s]表RP_BZ_NESTPAD无对应的[%s]信息", (char *)TCTime::Now(), (char *)owner_id);
 			}
 			// 拼接报文			
 			std::string res_buf = JointPkgFields(nest_pad_infos, rfid_status_resp_infos);
@@ -867,8 +857,7 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 			}
 			else
 			{
-				//TODO:RP_BZ_GATHER_DEV无对应的IMEI
-				LOG_WRITE("表RP_BZ_GATHER_DEV[%s]无对应的IMEI.\n", (char *)pkg.pkg_gather_imei);
+
 			}
 			// 根据报文获取补录信鸽的信息
 			TCString add_record_num = lsTrackerPkgList[10];
@@ -890,14 +879,15 @@ void TCPigeonLocationPigeonGatherHandler::DoCommand_LocInfo(TCCustomUniSocket  &
 					sql_buf += "'";
 					otl_stream otl_s(1, sql_buf.c_str(), m_dbConnect);
 					if (!otl_s.eof()) {
-						res_info.ring_type = 1;						
+						res_info.ring_type = 1;
+						racing_pigeons_data_resp_info.push_back(res_info);
 					}
 					else
 					{
 						LOG_WRITE("RP_BZ_IRING 无对应的rfid[%s]该环为普通环\n", res_info.rfid.c_str());
 						res_info.ring_type = 0;
+						racing_pigeons_data_resp_info.push_back(res_info);
 					}
-					racing_pigeons_data_resp_info.push_back(res_info);
 					otl_s.flush();
 					otl_s.close();
 				}	catch (const otl_exception & e) {

@@ -45,6 +45,7 @@ delete from RP_BR_NESTVIDEO_SUBPROC
 select * from RP_BR_NESTVIDEO_SUBPROC
 select * from RP_BR_PIGEON_NESTVIDEO
 delete from RP_BR_PIGEON_NESTVIDEO
+delete from RP_BR_NESTVIDEO_SUBPROC
 
 select iring_rfid,ring_type from RP_BZ_RACINGPIGEON order by iring_rfid
 select * from RP_BR_GATHER_SUBPROC
@@ -59,6 +60,9 @@ delete from RP_BR_GATHER_SUBPROC where iring_rfid='7A0021D772'
 delete from RP_BZ_RACINGPIGEON where iring_rfid='XXXXXXXXXX'
 
 select * from RP_BR_NESTPAD_SUBPROC
+delete from RP_BR_NESTPAD_SUBPROC
+select * from RP_BR_MATCH_RESULT
+select * from RP_BZ_RACINGPIGEON
 
 
 

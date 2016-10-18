@@ -45,6 +45,7 @@ delete from RP_BR_NESTVIDEO_SUBPROC
 select * from RP_BR_NESTVIDEO_SUBPROC
 select * from RP_BR_PIGEON_NESTVIDEO
 delete from RP_BR_PIGEON_NESTVIDEO
+delete from RP_BR_NESTVIDEO_SUBPROC
 
 select iring_rfid,ring_type from RP_BZ_RACINGPIGEON order by iring_rfid
 select * from RP_BR_GATHER_SUBPROC
@@ -63,6 +64,8 @@ delete from RP_BR_NESTPAD_SUBPROC
 select * from RP_BR_MATCH_RESULT
 select * from RP_BZ_RACINGPIGEON
 
+
+select  partition_name from user_tab_partitions where table_name='MB_BSS_TERMINAL_LOCATION';
 
 
 
